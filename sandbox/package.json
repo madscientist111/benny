@@ -1,0 +1,14 @@
+{
+	"name": "bobby-sandbox-dev",
+	"private": true,
+	"type": "module",
+	"description": "The deployed sandbox Worker for `cf dev --mode remote-sandbox`. Its packages resolve from the repo root's node_modules.",
+	"scripts": {
+		"deploy": "cf deploy"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "beta",
+		"cf": "^1.0.0-beta.18",
+		"vite": "^8.3.0"
+	}
+}

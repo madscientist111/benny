@@ -1,0 +1,38 @@
+{
+	"name": "benny",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "cf dev --port 8787",
+		"dev:remote-sandbox": "cf dev --port 8787 --mode remote-sandbox",
+		"sandbox:deploy": "cd sandbox && cf deploy",
+		"codemode-sandbox:deploy": "cd codemode-sandbox && cf deploy",
+		"build": "cf build",
+		"deploy": "cf deploy",
+		"cf-typegen": "cf workers types",
+		"webhook:test": "node scripts/test-webhook.mjs",
+		"typecheck": "cf workers types && tsc",
+		"probe:decisions": "node --experimental-strip-types --no-warnings scripts/probe-decisions.ts"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "beta",
+		"cf": "^1.0.0-beta.18",
+		"typescript": "^7.0.2",
+		"vite": "^8.3.0"
+	},
+	"dependencies": {
+		"@chat-adapter/github": "^4.44.0",
+		"@cloudflare/computer": "0.11.2",
+		"@cloudflare/sandbox": "1.0.3",
+		"@earendil-works/chord": "1.5.2",
+		"@earendil-works/pi-ai": "^1.5.2",
+		"@earendil-works/pi-codemode": "1.5.2",
+		"@earendil-works/pi-durable": "1.5.2",
+		"@platformatic/vfs": "^0.5.0",
+		"agents": "^0.33.0",
+		"chat": "^4.44.0",
+		"chat-state-cloudflare-do": "^0.2.0",
+		"hono": "^4.13.18",
+		"just-bash": "^3.6.0"
+	}
+}

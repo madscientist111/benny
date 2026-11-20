@@ -1,0 +1,14 @@
+{
+	"name": "bobby-codemode-sandbox",
+	"private": true,
+	"type": "module",
+	"description": "The code mode sandbox Worker: each script's QuickJS VM runs in a Durable Object here, off PiAgent's thread. Its packages resolve from the repo root's node_modules.",
+	"scripts": {
+		"deploy": "cf deploy"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "beta",
+		"cf": "^1.0.0-beta.18",
+		"vite": "^8.3.0"
+	}
+}

@@ -1,0 +1,22 @@
+# The sandbox image: the code copy lands in /workspace/repo, the dependency store in
+# /var/pnpm-store, and background servers keep their pid and log under /var/lib/servers.
+FROM node:24-trixie-slim
+
+# `@cloudflare/sandbox`'s `Files` class runs this helper inside the container.
+COPY --from=docker.io/cloudflare/sandbox:1.0.3 /usr/local/bin/sandbox-shim /usr/local/bin/sandbox-shim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pinned: every sandbox run installs with this exact pnpm.
+RUN npm install -g pnpm@10.34.9
+
+# The egress proxy's CA exists only in the running container, so this path is set here and the
+# entrypoint in `SandboxDO` trusts the file. `bash -lc` reads it for every command.
+RUN printf '%s\n' 'export NODE_EXTRA_CA_CERTS=/etc/cloudflare/certs/cloudflare-containers-ca.crt' \
+    > /etc/profile.d/10-benny-ca.sh
+
+RUN mkdir -p /workspace /var/pnpm-store /var/lib/servers
+
+CMD ["sleep", "infinity"]

@@ -1,0 +1,10 @@
+# Approve build scripts needed by the generated Worker's dependencies.
+allowBuilds:
+  '@google/genai': true
+  # Native compression addons pulled in by just-bash; Workers can't load them.
+  '@mongodb-js/zstd': false
+  core-js-pure: true
+  esbuild: true
+  node-liblzma: false
+  protobufjs: true
+  workerd: true
