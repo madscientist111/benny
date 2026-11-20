@@ -1,7 +1,9 @@
 # Benny
 
-GitHub bot on Cloudflare Workers. Mentions are handled by a per-thread `PiAgent` Durable Object;
-follow-up messages without a mention are classified by a decision model.
+A coding agent in GitHub issues, on Cloudflare Workers. A mention starts a request in the
+thread's own `PiAgent` Durable Object; a comment without a mention goes to the decision model,
+which picks ignore, react or reply. The rules below apply to anyone changing the code, person
+or agent.
 
 - **Subscriptions are the gate for `PiAgent`.** Any call to a DO stub (`getAgentByName`, RPC)
   wakes the object and bills duration. The first mention calls `thread.subscribe()`; after that
