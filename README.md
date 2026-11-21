@@ -1,6 +1,6 @@
 # Benny
 
-![Benny: mention it on a GitHub issue, and it opens a pull request](assets/benny-banner.png)
+![Benny, a beaver in a hard hat holding an issue card](assets/benny-banner.png)
 
 A coding agent that lives in my GitHub issues. I mention it, it researches, writes the requirements with me, works on its own branch and opens a PR. It runs on Cloudflare Workers, so my laptop can be off.
 
