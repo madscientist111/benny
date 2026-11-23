@@ -25,7 +25,7 @@ It creates `bobby/issue-53`, commits there through the GitHub API and opens a PR
 
 Every reply ends with a usage footnote, so I always know what a request took:
 
-`Benny worked 4.2 min · 42 turns, 88k context (2.3M sent, 96% cached), 34k out · 12 tool calls · sandbox: 2 calls, 49 s`
+`Benny worked 4.2 min · 42 turns, 88k context (2.3M sent, 96% cached), 34k out · 12 tool calls`
 
 ## Why I built it
 
@@ -35,7 +35,7 @@ The first win came fast: a review agent on the spare OpenCode Go usage I was alr
 
 The second win was putting everything in one place. GitHub is my Linear, my Notion and my code host. Benny creates and updates its own issues and tracks its progress there, in a UI I already live in.
 
-The third step was Claude Code as the harness. In production each thread now runs Claude Code in its own container, and Claude Code reaches Benny's tools (GitHub, the work branch, web search) over MCP. The pi harness stays: it runs in dev, and it can hand a single task to Claude Code through a `claude_code` tool.
+Then I made Claude Code the harness in production, and kept pi for dev. Both sit behind one contract, so the rest of Benny does not know which one runs.
 
 ## A normal day
 
@@ -43,7 +43,7 @@ I mention `@bobby-sb` on a few issues and ask it to research things. The threads
 
 Some work repeats, so a mention can also set a schedule: `@bobby-sb every weekday at 9am IST, post a digest of what merged and what is stuck`. Benny confirms the schedule and the next time in words, then posts in that issue each time it comes due. Closing the issue pauses it.
 
-When a reply ends on a question for me, Benny puts `[INPUT_REQUIRED]` on the issue title and an `input-required` label, so one search shows every thread that waits for me. My next comment clears it.
+Benny puts `[INPUT_REQUIRED]` on the issue title and adds an `input-required` label when a reply ends on a question for me, when a run pauses at its time limit, or when a PR is ready for review. One search shows every thread that waits for me, and my next comment clears the mark.
 
 It is the same loop I run with Claude Code on my laptop, with three differences: the laptop can be off, it runs on my own infrastructure, and I never think about which worktree or branch it is on. Nothing in it would break if three people used it.
 
@@ -54,21 +54,21 @@ flowchart LR
   gh[GitHub issue or PR] -->|webhook| worker[Worker]
   worker -->|no mention: ignore, react or reply?| jev[Decision model]
   worker -->|mention| agent[PiAgent: one Durable Object per thread]
-  agent -->|tasks| claude[Claude Code container]
+  agent -->|production: every task| claude[Claude Code container]
   claude -->|tools over MCP| agent
   agent -->|reads| repo[RepoDO: default branch]
   agent -->|edits| branch[BranchDO: work branch]
-  agent -->|tests, typecheck, servers| sandbox[Sandbox container]
+  agent -->|pi harness: tests, typecheck, servers| sandbox[Sandbox container]
   branch -->|commits through the API| gh
   agent -->|reply with a usage footnote| gh
 ```
 
-- **One agent per thread.** Each issue or PR gets its own `PiAgent` Durable Object. It sleeps between messages and costs nothing while it waits. A person starts every run with a mention, or sets a schedule with one.
+- **One agent per thread.** Each issue or PR gets its own `PiAgent` Durable Object. It sleeps between messages and costs nothing while it waits. A person starts every run with a mention, or with a schedule that a mention set.
 - **Files live in Durable Objects.** `RepoDO` holds the default branch, `BranchDO` the work branch. Commits go through the GitHub API: no clone, no git process.
-- **A sandbox only when needed.** Reading and editing code needs no container. For tests, typechecks and servers I added Cloudflare Sandbox containers, with the pnpm store cached in R2 by lockfile hash.
-- **Two harnesses behind one contract.** In production the model's work is Claude Code (`claude-sonnet-5-5`), in a container of a second Worker, one container per thread. It has no GitHub token: it calls Benny's tools over MCP with a token that lasts for one run, and the same write gate applies. In dev the harness is pi-durable on OpenCode Go (default `deepseek-v4.1-flash`).
+- **Containers.** In production every request runs in the thread's Claude Code container, which holds a copy of the repo and runs the tests itself. In the pi harness, reading and editing code needs no container; for tests, typechecks and servers it starts a Cloudflare Sandbox container, with the pnpm store cached in R2 by lockfile hash.
+- **Two harnesses behind one contract.** In production the model's work is Claude Code (`claude-sonnet-5-5`), in a container of a second Worker, one container per thread. It has no GitHub token: it calls Benny's tools over MCP with a token that lasts for one run, and the same write gate applies. In dev the harness is pi-durable on OpenCode Go (default `deepseek-v4.1-flash`), and it can hand a single task to Claude Code through a `claude_code` tool.
 - **A decision model for follow-ups.** After the first mention, every comment in the thread without a mention is classified as ignore, react or reply, so Benny doesn't answer every "thanks". The model answers typed questions with probabilities and plain code decides (`src/jev/decide.ts`). I started on Workers AI (`clef-flash`) and moved to TypeSafe's Jev 1.13 through OpenRouter, because it reads short, vague messages better: 43–44 of 44 test messages against 35. The same model says whether a posted reply waits for me.
-- **Schedules.** A cron is a schedule, a timezone and a prompt kept for one issue. The thread's Durable Object wakes itself at the next time. A page at `/crons`, behind Cloudflare Access, lists them all.
+- **Schedules.** A cron is a schedule, a timezone and a prompt kept for one issue. The thread's Durable Object wakes itself when the cron is next due. A page at `/crons`, behind Cloudflare Access, lists them all.
 - **Search and other repos.** Web search through Exa. A public repo linked in the thread can be read, in its own Durable Object.
 - **Checks.** `pnpm test` runs the rules that are plain code. The decision model has a recorded eval, and CI fails when its questions change without a new run.
 
@@ -77,8 +77,8 @@ flowchart LR
 - **Writes need a member.** A GitHub write or branch tool runs only when every pending request of the run is a mention from a repo member with write access. The check reads GitHub permissions on every request.
 - **It opens PRs, and that's it.** There is no tool to merge, approve or close a PR. It pushes only to `bobby/...` branches and never changes `.github/workflows`.
 - **Schedules are writes.** Setting or removing a cron needs the same mention from a member, and a cron's own firing can never join a person's run.
-- **Sandbox network:** GET and HEAD to the npm registry only, with credentials stripped.
-- **Secrets:** the tools hide `.env`, `.dev.vars`, keys and the like from the model.
+- **Network:** the Claude Code container in production has full internet access. The pi harness's sandbox is limited to GET and HEAD to the npm registry, with credentials stripped.
+- **Secrets:** the tools hide `.env`, `.dev.vars`, keys and the like from the model. The Claude Code container holds one secret, the Claude Code token, in its environment.
 - **Not covered:** text from outsiders (comments, fetched web pages) can still steer a run that a member started. I run it only on repos where I know who comments.
 
 ## Limitations
