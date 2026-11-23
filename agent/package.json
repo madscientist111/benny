@@ -1,0 +1,14 @@
+{
+	"name": "bobby-agent-dev",
+	"private": true,
+	"type": "module",
+	"description": "The deployed agent Worker: each thread's AgentDO and its Claude Code container. Its packages resolve from the repo root's node_modules.",
+	"scripts": {
+		"deploy": "cf deploy"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "beta",
+		"cf": "^1.0.0-beta.18",
+		"vite": "^8.3.0"
+	}
+}

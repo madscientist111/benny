@@ -12,7 +12,8 @@ import { log } from './log'
 import { recordMessage } from './thread-window'
 import { httpStatus } from './github-contract'
 import { isPaused, postStatus, reportFailure, setPaused } from './request-reporter'
-import { clearInputRequired, hasInputRequired, withoutPrefix } from './input-required'
+import { clearInputRequired, hasInputRequired } from './input-required'
+import { withoutTitleMarks } from './title-marks'
 import { asksToStop, classify } from './jev/classify'
 
 // The webhook side of Benny: the Chat SDK bot with its GitHub adapter, and the two handlers that
@@ -20,13 +21,14 @@ import { asksToStop, classify } from './jev/classify'
 // in a subscribed thread goes to the decision model. The run itself belongs to `PiAgent`
 // (`pi-agent.ts`).
 
+// Both come from `cloudflare.config.ts`: `bobby-sb` when deployed, `bobby-local` in dev.
 // Must be the GitHub App *slug* (github.com/apps/<slug>), not the app name,
 // the repo name, or the `…[bot]` login. This is what `@`-mention detection matches.
-export const BOT_USERNAME = 'bobby-sb'
-// Numeric id of the `bobby-sb[bot]` account (public: api.github.com/users/bobby-sb%5Bbot%5D).
-// Without it the adapter detects the id asynchronously per isolate, and webhooks that arrive
-// first see Benny's own comments with `isMe: false`, so subscribed threads would classify them.
-const BOT_USER_ID = 356604674
+export const BOT_USERNAME = env.BOT_USERNAME
+// Numeric id of the `<slug>[bot]` account. Without it the adapter detects the id asynchronously
+// per isolate, and webhooks that arrive first see Benny's own comments with `isMe: false`, so
+// subscribed threads would classify them.
+const BOT_USER_ID = Number(env.BOT_USER_ID)
 
 // `github.octokit` only knows the installation inside a webhook the Chat SDK handles. Push
 // events never reach the SDK, so this subclass opens up the adapter's own per-installation
@@ -53,6 +55,16 @@ export const github = new BennyGitHubAdapter({
 
 // Per-thread state kept by the SDK (30-day TTL from the last write).
 type ThreadState = { title: string }
+// The CHAT_STATE namespace, read from `env` on each call rather than at module load. Cloudflare
+// runs this module once to check an upload, and on a Worker's first deploy that check has no
+// `env.CHAT_STATE` yet, so an adapter given the binding itself throws (error 10021).
+// The adapter calls only `idFromName` and `get`.
+const chatStateNamespace = {
+    idFromName: (name: string) => env.CHAT_STATE.idFromName(name),
+    get: (...args: Parameters<DurableObjectNamespace['get']>) => env.CHAT_STATE.get(...args),
+} as unknown as DurableObjectNamespace<ChatStateDO>
+
+
 
 export const bot = new Chat<{ github: typeof github }, ThreadState>({
     userName: BOT_USERNAME,
@@ -60,7 +72,11 @@ export const bot = new Chat<{ github: typeof github }, ThreadState>({
         github
     },
     // Persistent across isolates, so subscriptions, locks and dedupe actually hold.
-    state: createCloudflareState({ namespace: env.CHAT_STATE as unknown as DurableObjectNamespace<ChatStateDO> })
+    state: createCloudflareState({ namespace: chatStateNamespace }),
+    // A comment that comes while the thread's handler runs waits in ChatStateDO's queue and is handled
+    // when that handler ends, in the same webhook's background task, instead of being dropped with a
+    // LockError. With 3 or more waiting, only the newest runs (`docs/learnings/chat-sdk.md`).
+    concurrency: 'queue',
 })
 
 
@@ -94,13 +110,14 @@ const isRepoMember = async (threadId: string, message: BotMessage) => {
 
 // The title is cached in thread state; it's refetched when missing (first mention, or after
 // the state expired). Returns the issue when it fetched one, so handleReply can reuse it. The
-// cached title leaves out the waiting mark's prefix, so the decision model's input stays the same.
+// cached title leaves out the waiting and scheduled marks' prefixes, so the decision model's input
+// stays the same.
 const getTitle = async (thread: BotThread): Promise<{ title: string; issue?: Issue }> => {
     const cached = await thread.state
     if (cached?.title) return { title: cached.title }
     const issue = await fetchIssue(thread.id)
-    await thread.setState({ title: withoutPrefix(issue.title) })
-    return { title: withoutPrefix(issue.title), issue }
+    await thread.setState({ title: withoutTitleMarks(issue.title) })
+    return { title: withoutTitleMarks(issue.title), issue }
 }
 
 // Requirement 35: only someone who may push to the repo can stop a run or send a go-ahead.

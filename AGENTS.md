@@ -14,8 +14,9 @@ or agent.
   message window (`src/thread-window.ts`). Values round-trip as JSON: store timestamps as
   numbers, never `Date`.
 - **Decision model** (ignore / react / reply): before changing any question, state field, or
-  threshold in `src/jev/`, read `docs/decision-model/` and re-run `pnpm probe:decisions`.
-  Record new lessons in `docs/decision-model/tuning-lessons.md`.
+  threshold in `src/jev/`, read `docs/decision-model/`. After the change run `pnpm test` and
+  `pnpm probe:decisions --runs 2 --record`, and commit `scripts/probe-baseline.json` (CI's
+  `probe:check` fails without it). Record new lessons in `docs/decision-model/tuning-lessons.md`.
 - **Names say what they hold**, scripts included: `answers`, not `a`; `twoDecimals`, not `f`.
   When a short name can't be avoided, add a comment saying what it is.
 - **One word per thing, and names that describe.** Pick one word for each idea and use it in
@@ -48,6 +49,18 @@ or agent.
   a line about a push carries `deliveryId`, because a push has no request. The one exception is the
   owner's debug route in `src/index.ts`.
 - **PR descriptions and explanations** for people follow `.claude/skills/writing-explanations/SKILL.md`.
+- **Effort is counted in tasks, never in days or hours** (full steps and report format:
+  `.claude/skills/effort-plan/SKILL.md`). Read the docs of what the work touches first, then split it into tasks
+  that can each be checked on their own, splitting again as you learn. Sort each task: a *copy* task
+  has a doc or example and its mistake fails loudly; a *find-out* task has no doc, but one run
+  answers it, and may turn into a design task; a *design* task has no example and needs a person's
+  decision, then a live test. A mistake that stays silent first needs a check that makes it loud:
+  that check is a task.
+  - **Undo:** mark every design decision easy or hard to undo. Hard means stored data, production,
+    or something public.
+  - **Only a person:** list accounts, secrets and servers on their own, each with the tasks it blocks.
+  - **Report** the counts, the order with its wait points, and which check covers the work
+    (`pnpm test`, `pnpm verify`) or is missing.
 - **Learnings:** `docs/learnings/` holds project-wide gotchas, one page per topic (Durable
   Objects, chat SDK, D1 / cf CLI, models). Read the matching page before working in that area;
   when you hit a new non-obvious lesson, add it there (format: `docs/index.md`) and tell the user.

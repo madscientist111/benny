@@ -3,7 +3,7 @@ import type { PrChanges } from './pi-agent'
 
 // Shared types for the sandbox. Every caller reaches a thread's sandbox through `SandboxClient`,
 // whether the sandbox runs in this Worker (a `SandboxDO` stub) or in the deployed sandbox Worker
-// (`SandboxService`, the `remote-sandbox` dev mode in `cloudflare.config.ts`).
+// (`SandboxService`, every mode but production in `cloudflare.config.ts`).
 
 /** What a run copies into its sandbox besides the repo archive `start` gets: the PR files on top. */
 export type Sources = {
@@ -67,7 +67,7 @@ export interface SandboxServiceMethods {
     shutdown(sandboxName: string, request: { reason: string }): Promise<void>
 }
 
-/** The binding `cloudflare.config.ts` sets in `remote-sandbox` mode instead of `SANDBOX`. */
+/** The binding `cloudflare.config.ts` sets outside production instead of `SANDBOX`. */
 export const SANDBOX_SERVICE_BINDING = 'SANDBOX_SERVICE'
 
 /** What `installDependencies` needs from the `SandboxDO` that calls it. */

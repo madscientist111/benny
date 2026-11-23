@@ -93,7 +93,7 @@ const readResponseBody = async (response: Response, capBytes: number): Promise<{
 // (requirements 8, 10, 39). Every public method is an RPC endpoint; internals use `#`.
 //
 // It runs in two Workers, Benny's own and the deployed `bobby-sandbox-dev`
-// (`sandbox/cloudflare.config.ts`, the `remote-sandbox` dev mode), so it may read only bindings
+// (`sandbox/cloudflare.config.ts`, used in dev), so it may read only bindings
 // both configs declare (`DEPENDENCY_CACHE`), never one only Benny has, such as `REPO`.
 export class SandboxDO extends DurableObject<Env> implements SandboxClient {
     /**
@@ -408,7 +408,7 @@ export class SandboxDO extends DurableObject<Env> implements SandboxClient {
         const sources = await this.ctx.storage.get<StoredSources>('sources')
         if (!sources) throw new Error('No sources: the agent must call setSources first')
         const runId = sources.runId
-        // The install saves its store here. Benny's `remote-sandbox` mode has no such binding,
+        // The install saves its store here. Benny in dev has no such binding,
         // because this object never runs there, so a missing one is a config error worth naming
         // before a container starts.
         const bucket = this.env.DEPENDENCY_CACHE

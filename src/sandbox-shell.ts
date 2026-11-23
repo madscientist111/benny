@@ -19,7 +19,7 @@ const HEAD_SHARE = 3 / 4
 /** `timeout --kill-after=5` needs 5 s to kill, and the abort waits 15 s more before it fires. */
 const ABORT_GRACE_SECONDS = 20
 
-type CappedText = { text: string; truncated: boolean }
+export type CappedText = { text: string; truncated: boolean }
 
 const concatBytes = (chunks: Uint8Array[], totalBytes: number) => {
     const bytes = new Uint8Array(totalBytes)
@@ -33,9 +33,10 @@ const concatBytes = (chunks: Uint8Array[], totalBytes: number) => {
 
 /**
  * Reads a stream to its end, keeping the first three quarters of `capBytes` and the last
- * quarter. The bytes in between are counted, never held: a command can print gigabytes.
+ * quarter. The bytes in between are counted, never held: a command can print gigabytes. Also
+ * reads the agent runner's stderr (`agent-do.ts`).
  */
-const readCappedText = async (stream: ReadableStream<Uint8Array> | null, capBytes: number): Promise<CappedText> => {
+export const readCappedText = async (stream: ReadableStream<Uint8Array> | null, capBytes: number): Promise<CappedText> => {
     if (!stream) return { text: '', truncated: false }
     const headCap = Math.floor(capBytes * HEAD_SHARE)
     const tailCap = capBytes - headCap

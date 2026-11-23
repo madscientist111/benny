@@ -1,5 +1,3 @@
-import { env } from 'cloudflare:workers'
-
 /**
  * The ids that tie a log line to GitHub. A *request* is one comment asking Benny: `requestId` is
  * that comment's id, the same value the code keeps as `requestMessageId` (a stored field, so not
@@ -19,8 +17,9 @@ const PRIVATE_FIELDS = ['args', 'state']
  * (`requestId = 6921062300`) and a local `grep` still finds the whole line.
  */
 export const log = (message: string, fields: Record<string, unknown> = {}): void => {
-    // The generated type is the config's literal `'production'`; `.dev.vars` changes it at run time.
-    const keptFields = (env.ENVIRONMENT as string) === 'development'
+    // Read from `process.env` (`nodejs_compat` fills it from the bindings), not from
+    // `cloudflare:workers`, so the Node probes in scripts/ can import this file.
+    const keptFields = process.env.ENVIRONMENT === 'development'
         ? fields
         : Object.fromEntries(Object.entries(fields).filter(([name]) => !PRIVATE_FIELDS.includes(name)))
     let line: string

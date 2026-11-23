@@ -3,9 +3,8 @@ import type { SandboxDO } from './sandbox-do'
 
 /**
  * One thread's sandbox. There are two ways to reach it, and `cloudflare.config.ts` is the switch:
- * `SANDBOX` (the `SandboxDO` stub, production and normal dev) or the `SANDBOX_SERVICE` binding
- * (the deployed sandbox Worker, `npm run dev:remote-sandbox`, for a machine whose local container
- * cannot start).
+ * `SANDBOX` (the `SandboxDO` stub, production) or the `SANDBOX_SERVICE` binding (the deployed
+ * sandbox Worker, every other mode, because a local container cannot start on native Linux).
  */
 export const sandboxClient = (env: Env, sandboxName: string): SandboxClient => {
     // `Env` types a binding to another Worker as a bare `Fetcher`, which carries no RPC methods,

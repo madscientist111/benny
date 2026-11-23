@@ -1,5 +1,4 @@
-// The entry of the deployed `bobby-sandbox-dev` Worker, which serves `npm run
-// dev:remote-sandbox`: the same `SandboxDO` as Benny's own, without Benny's secrets.
+// The entry of the deployed `bobby-sandbox-dev` Worker, which serves `pnpm dev`: the same `SandboxDO` as Benny's own, without Benny's secrets.
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import {
     type ExecRequest,
@@ -37,7 +36,7 @@ export type SandboxWorkerEnv = {
 const SANDBOX_NAME_PATTERN = /^[0-9a-f]{64}$/
 
 /**
- * What Benny reaches in `remote-sandbox` mode: each `SandboxClient` method with the thread's
+ * What Benny reaches in dev: each `SandboxClient` method with the thread's
  * sandbox name first. It only forwards; `SandboxDO` owns the container and does the work.
  */
 export class SandboxService extends WorkerEntrypoint<SandboxWorkerEnv> implements SandboxServiceMethods {

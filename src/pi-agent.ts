@@ -2,19 +2,23 @@ import { Agent } from "agents";
 import { Workspace, getWorkspace, type WorkspaceStub } from "@cloudflare/computer";
 import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
 import { createGitClient } from "@cloudflare/computer/git";
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { ConversationIdle, defineExtension, hook, ToolTask, type ToolRegistration } from "@earendil-works/pi-durable";
-import { codemodeExtension } from './codemode'
+import { ConversationBusy, defineExtension, hook, ToolTask, type ToolRegistration } from "@earendil-works/pi-durable";
+import { codemodeExtension, scriptSandbox } from './codemode'
 import { codemodeLimitHooks, type CodemodeCallKind } from './codemode-limits'
-import { createAssistantHarness } from './harness'
+import { createHarness } from './harness'
+import type { Harness, RunUsage } from './harness-contract'
 import { log, type LogIds } from './log'
+import type { AgentWorkspace, ToolTaskAccess } from './claude-code-run'
+import { claudeCodeTool, claudeCodeToolBindings } from './claude-code-tool'
+import { answerMcpRequest, mcpTools, newTaskToken, servedTools, taskTokenKey, toolAccessFor, TASK_TOKEN_KEY_PREFIX, unknownTaskReply, type McpReply, type McpRequest, type McpTools, type McpTask } from './mcp-tools'
 import { Benny } from "./pi-prompts";
 import { REPO_DIR } from './checkout'
 import { BENNY_GIT_IDENTITY, repoObjectName, type RepoDO } from "./repo-do";
 import { sandboxClient } from "./sandbox-client";
 import type { SandboxClient } from "./sandbox-contract";
-import { mergedIntervalsMs, sandboxTools, type SandboxDetails, type SandboxInterval } from "./sandbox-tools";
+import { sandboxTools } from "./sandbox-tools";
 import {
+    postStatus,
     reportFailure,
     reportFollowerEnded,
     reportFollowerJoined,
@@ -29,8 +33,16 @@ import type { BranchDO } from './branch-do'
 import { branchTools } from './branch-tools'
 import { branchObjectName, lowerRepoName, RUN_WRITE_LIMITS, type BranchCopy, type RunWriteCounts, type RunWriteKind, type ThreadWork } from './github-contract'
 import { githubTools, WRITE_REFUSED_TEXT, type Octokit } from './github-tools'
-import { inputRequiredTool, setInputRequired } from './input-required'
+import { setInputRequired } from './input-required'
+import { askReplyWaits } from './jev/classify'
 import { createWebTools } from "./web-tools";
+import { checkRepoSize } from './repo-size'
+import {
+    CHECKED_FIRINGS, countCrons, cronTools, deleteCronCopy, FAILING_AFTER, formatFiringTime, MAX_CRONS, nextFirings, PAUSE_AFTER, postInIssue,
+    saveCronCopy, withFiring, type CronFiring, type CronInput, type CronRecord, type FiringOutcome,
+} from './crons'
+import { checkFiringLimit, countsTowardLimit, firingLimitSentence, lastFiringNote, skippedLastFiringNote, withCountedFiring } from './cron-limit'
+import { updateScheduledMark } from './scheduled-mark'
 import { publicRepoTools, type PublicRepo } from './public-repo'
 import { workspaceTools } from "./workspace-tools";
 
@@ -39,25 +51,14 @@ import { workspaceTools } from "./workspace-tools";
 // and reports each one to GitHub itself (`request-reporter.ts`), also after a restart. It also
 // holds the thread's PR changes.
 
-/** What one request used, for the footnote on each reply (requirement 48). */
-// `tokensIn` counts every input token, `cachedTokensIn` the part the provider served from its
-// prompt cache: pi-ai's `usage.input` alone leaves cached tokens out. `turns` counts the request's
-// assistant messages, and each turn sends the whole context again, so `tokensIn` says what the
-// request cost while `peakContextTokens`, the largest `input + cacheRead + cacheWrite` of one turn,
-// says how big its context got (the size `COMPACT_ABOVE_TOKENS` watches in `harness.ts`). Both count
-// only the messages after `transcriptCountBefore`, which inherits the compaction index issue (#21):
-// after a compaction that count points into a shorter list. `webSearches` and
-// `webFetches` count the model's calls to those two tools, refused ones included. `sandboxCalls`
-// counts the calls that reached the sandbox, a failed one too; `sandboxWallMs` the wall time the
-// sandbox was in use, `sandboxStarts` the starts those calls ran, and `sandboxInstallMs` the
-// installs of those starts. A call refused for missing write access never reached the sandbox, so
-// it is not counted.
-export type RequestUsage = {
-    ms: number; tokensIn: number; cachedTokensIn: number; tokensOut: number; toolCalls: number
-    turns: number; peakContextTokens: number
-    webSearches: number; webFetches: number
-    sandboxCalls: number; sandboxWallMs: number; sandboxStarts: number; sandboxInstallMs: number
-}
+/**
+ * What one request used, for the footnote on each reply (requirement 48): the run's time, and what
+ * the harness counted in the messages after the request's `transcriptCountBefore` (`RunUsage`,
+ * whose `peakContextTokens` is the size `COMPACT_ABOVE_TOKENS` watches in `harness.ts`).
+ * `sandboxStarts` counts the starts the sandbox calls ran, `sandboxInstallMs` the installs of those
+ * starts. A call refused for missing write access never reached the sandbox, so it is not counted.
+ */
+export type RequestUsage = { ms: number } & RunUsage
 
 /**
  * A PR's version of its changed files (requirements 29, 30). `path` is repo-relative
@@ -94,6 +95,8 @@ export type BennyRequest = {
     installationId: number
     /** The asker's login: a read of a repo other than the thread's needs every requester of the run to be a member of it (issue #53). */
     requester: string
+    /** Set when a cron's firing is the request: its end is noted on the cron (`docs/crons/plan.md`). */
+    cronId?: string
 }
 
 /**
@@ -133,6 +136,13 @@ type PendingRequest = {
     mentionsBenny?: boolean
     /** The asker's login, for the read of another repo. Missing on records written before it existed, which refuse one. */
     requester?: string
+    /** The cron whose firing this request is. */
+    cronId?: string
+    /**
+     * The asking comment's text, which the decision model reads beside the reply to tell whether the
+     * reply waits for the requester (plan rule 1). Missing on records written before it existed.
+     */
+    requestText?: string
 }
 
 const PENDING_REQUESTS_KEY = 'pendingRequests'
@@ -151,8 +161,8 @@ const PUBLIC_REPOS_KEY = 'publicRepos'
 const SANDBOX_BRANCH_REV_KEY = 'sandboxBranchRev'
 /** The run's GitHub writes, by kind (plan 4.4), in `ctx.storage.kv` so an eviction keeps them. */
 const RUN_WRITES_KEY = 'githubWritesThisRun'
-/** The run's reply asks a writer for something: the reply puts the waiting mark on (`docs/input-required/plan.md`, rule 1). */
-const RUN_ASKS_INPUT_KEY = 'asksInputThisRun'
+/** The issue's cron (`crons.ts`); ChatStateDO keeps a copy of it. */
+const CRON_KEY = 'cron'
 const NO_RUN_WRITES = Object.fromEntries(Object.keys(RUN_WRITE_LIMITS).map((kind) => [kind, 0])) as RunWriteCounts
 /**
  * The run's code mode counts, kept in `ctx.storage.kv` so an eviction keeps them: `codemode-limits.ts`
@@ -161,6 +171,13 @@ const NO_RUN_WRITES = Object.fromEntries(Object.keys(RUN_WRITE_LIMITS).map((kind
 type CodemodeRunCalls = { scripts: number; nestedCalls: number }
 const CODEMODE_RUN_CALLS_KEY = 'codemodeCallsThisRun'
 const NO_CODEMODE_CALLS: CodemodeRunCalls = { scripts: 0, nestedCalls: 0 }
+/**
+ * What the run's tools may do, as `#configureToolAccess` decided for its latest request: a harness
+ * outside the Worker reads it when it starts a tool task, and each MCP call checks it again, so a
+ * non-writer who joins the run turns writes off for a task already running.
+ */
+type RunToolAccess = { runId: string; mayWrite: boolean; canRunCode: boolean }
+const RUN_TOOL_ACCESS_KEY = 'runToolAccess'
 /** How often `checkPendingRequests` edits the status comments and checks the 30-minute limit (requirement 31). */
 const CHECK_INTERVAL_SECONDS = 60
 /** A run this long pauses and waits for a go-ahead (requirement 33). */
@@ -191,15 +208,16 @@ const reportSafely = async (operationId: string, request: PendingRequest, report
 }
 
 export class PiAgent extends Agent<Env> {
-    private harness;
-    private registry;
+    // The harness that runs the model for this thread (`harness-contract.ts`), chosen by `HARNESS`.
+    #harness: Harness;
     // The sandbox tools: a run that may not run code is not offered them (requirement 37).
     #sandboxTools: readonly ToolRegistration[]
-    // The GitHub write tools and the branch tools the model may call, which `modelTools` hides unless
+    // The GitHub write tools and the branch tools the model may call, which `#configureToolAccess` hides unless
     // every pending request is a writer's mention.
     #githubWriteTools: readonly ToolRegistration[]
-    // The names of `#sandboxTools`, for the usage loop: only their results carry the details the
-    // footnote counts, so the tool name, never the shape of `details`, decides which count.
+    // The `claude_code` tool when it is on (`claudeCodeToolBindings`): hidden like the sandbox tools.
+    #claudeCodeTools: readonly ToolRegistration[] = []
+    // The names of `#sandboxTools`, for the footnote's sandbox counts (`Harness.usageSince`).
     #sandboxToolNames: ReadonlySet<string>
     // The RepoDO name from `useRepo`, kept here and in storage for after a restart.
     #repoNameValue: string | undefined
@@ -214,6 +232,8 @@ export class PiAgent extends Agent<Env> {
     // Whether code mode is on for this object: only the exact `'true'` in `CODEMODE_ENABLED` turns it
     // on. Read here, before the prompt and the extensions take their shape from it.
     #codeModeEnabled = false
+    // Benny's tools as an MCP server, for a harness that runs outside the Worker (`mcp-tools.ts`).
+    #mcpTools: McpTools
     // The id of the run this object is working on, which every line about the run's work carries;
     // `undefined` means no run is active here. `start` sets it, and while it is set the run holds
     // the web tools' allowed links and web budget: `start` reads and sets it with no `await`
@@ -251,17 +271,23 @@ export class PiAgent extends Agent<Env> {
     constructor(ctx: DurableObjectState, env: Env) {
         super(ctx, env);
 
-        const created = createAssistantHarness(this.env);
-        this.harness = created.harness;
-        this.registry = created.registry;
-        this.lifecycle.use(this.harness);
+        const created = createHarness(this.env, {
+            lifecycle: this.lifecycle,
+            isSandboxTool: (toolName) => this.#sandboxToolNames.has(toolName),
+            newTaskToken: () => this.#newTaskToken(),
+            agentName: this.ctx.id.toString(),
+            store: this.ctx.storage.kv,
+            workspace: () => this.#agentWorkspace(),
+        });
+        this.#harness = created.harness;
+        const registry = created.registry;
 
         // A missing binding or any value but `'true'` means off: exactly today's behaviour without a code deploy.
         // The cast: the generated type is the config's own literal (`'false'`), and a deployment may set `'true'`.
         this.#codeModeEnabled = (this.env.CODEMODE_ENABLED as string) === 'true'
 
         // install benny agent
-        this.registry.install(Benny(this.#codeModeEnabled))
+        registry.install(Benny(this.#codeModeEnabled))
         // The tools read the shared repo copy in RepoDO; `#repoName()` runs on the first call.
         const repoNamespace = this.env.REPO as unknown as DurableObjectNamespace<RepoDO>
         // Every tool line names the run it worked for, so two threads', or two runs', lines differ.
@@ -269,19 +295,21 @@ export class PiAgent extends Agent<Env> {
         // With code mode on, the 8 read tools are offered to scripts only (`callers: ['tools']`): the
         // model reads through `codemode`, and `#configureToolAccess` cannot offer them again.
         const readToolCallers = this.#codeModeEnabled ? (['tools'] as const) : undefined
-        this.registry.install(workspaceTools(getWorkspace(async () => repoNamespace.getByName(await this.#repoName())), { currentRunId, callers: readToolCallers }))
+        const repoFiles = workspaceTools(getWorkspace(async () => repoNamespace.getByName(await this.#repoName())), { currentRunId, callers: readToolCallers })
+        registry.install(repoFiles)
         // Two tool sets, same /repo/... paths, two different stores:
         //   read, ls, find, grep          → the shared RepoDO: the whole default branch.
         //   pr_read, pr_ls, pr_find, pr_grep → this thread's own workspace: only the files the PR
         //                                    changes, written there by `replacePrChanges` (req. 29, 30).
-        this.registry.install(workspaceTools(this.prChanges, {
+        const prFiles = workspaceTools(this.prChanges, {
             name: 'pr-changes',
             toolPrefix: 'pr_',
             describe: (description) => 'PR version: reads the PR\'s changed files at the same /repo/... paths. ' +
                 'Only files the PR changed are here; use the tool without pr_ for every other file. ' + description,
             currentRunId,
             callers: readToolCallers,
-        }))
+        })
+        registry.install(prFiles)
         // Commands run in this thread's own sandbox, one per thread. The container starts on the
         // first command of a run and stops when the run's last request is reported.
         const sandboxExtension = sandboxTools({
@@ -305,25 +333,38 @@ export class PiAgent extends Agent<Env> {
             beforeCommand: (client) => this.#writeBranchEditsToSandbox(client),
             // Every pending request of the run must come from a writer: a non-writer whose comment
             // joins a writer's run turns command running off for that run (requirement 37).
-            canRunCode: async () => {
-                const pendingRequests = Object.values(await this.#pendingRequests())
-                return pendingRequests.length > 0 && pendingRequests.every((request) => request.hasWriteAccess === true)
-            },
+            canRunCode: () => this.#everyRequestFromWriter(),
             currentRunId,
         })
-        this.registry.install(sandboxExtension)
-        // `modelTools` removes tools by their registration, so keep the ones it hides.
+        registry.install(sandboxExtension)
+        // Keep the tools `#configureToolAccess` may hide.
         this.#sandboxTools = sandboxExtension.tools ?? []
         this.#sandboxToolNames = new Set(this.#sandboxTools.map((tool) => tool.name))
+        // Claude Code as a tool of pi (issue #61, T7), in the thread's agent container: off unless
+        // `CLAUDE_CODE_TOOL_ENABLED` is `'true'` and `AGENT_SERVICE` is bound. Same gate as the sandbox.
+        const claudeCodeBindings = claudeCodeToolBindings(this.env)
+        if (claudeCodeBindings) {
+            const claudeCodeExtension = claudeCodeTool({
+                ...claudeCodeBindings,
+                agentName: this.ctx.id.toString(),
+                store: this.ctx.storage.kv,
+                newTaskToken: (writeTools) => this.#newTaskToken(writeTools),
+                workspace: () => this.#agentWorkspace(),
+                canRunCode: () => this.#everyRequestFromWriter(),
+                currentRunId,
+            })
+            registry.install(claudeCodeExtension)
+            this.#claudeCodeTools = claudeCodeExtension.tools ?? []
+        }
         // The web tools keep the links this run may read (requirement 52). Exa runs the lookups in
         // the Worker, so the model sees results and never the API key.
         this.#webTools = createWebTools({
             apiKey: this.env.EXA_API_KEY,
-            secrets: [this.env.EXA_API_KEY, this.env.OPENCODE_API_KEY, this.env.GITHUB_PRIVATE_KEY, this.env.GITHUB_WEBHOOK_SECRET]
+            secrets: [this.env.EXA_API_KEY, this.env.OPENCODE_API_KEY, this.env.GITHUB_PRIVATE_KEY, this.env.GITHUB_WEBHOOK_SECRET, this.env.OPENROUTER_KEY]
                 .filter((secret): secret is string => Boolean(secret)),
             currentRunId,
         })
-        this.registry.install(this.#webTools.extension)
+        registry.install(this.#webTools.extension)
         // Reading a public repo the requester linked (issue #51): one read-only copy in its own
         // RepoDO, fetched with no token, and only for a link the run saw.
         const publicRepo = publicRepoTools({
@@ -334,8 +375,8 @@ export class PiAgent extends Agent<Env> {
             currentRunId,
             callers: readToolCallers,
         })
-        this.registry.install(publicRepo.list)
-        this.registry.install(publicRepo.files)
+        registry.install(publicRepo.list)
+        registry.install(publicRepo.files)
         // The GitHub tools (batch 5): reads for every member, writes only for a writer's mention.
         const github_ = githubTools({
             octokit: () => this.#octokit(),
@@ -351,15 +392,8 @@ export class PiAgent extends Agent<Env> {
             currentRunId,
             markPrReady: async (number) => this.#markWaiting(number, (await currentRunId()) ?? 'unknown', 'pr ready'),
         })
-        this.registry.install(github_.read)
-        // Notes that the reply asks a writer for something; the mark goes on with the reply.
-        this.registry.install(inputRequiredTool(async () => {
-            const allWriters = await this.#everyPendingRequest((request) => request.hasWriteAccess === true)
-            if (allWriters) this.ctx.storage.kv.put<boolean>(RUN_ASKS_INPUT_KEY, true)
-            log('tool', { name: 'mark_input_required', noted: allWriters, runId: await currentRunId() })
-            return allWriters
-        }))
-        this.registry.install(github_.write)
+        registry.install(github_.read)
+        registry.install(github_.write)
         // The branch tools, and file tools over the work branch's copy at the same /repo paths.
         const branch_ = branchTools({
             octokit: () => this.#octokit(),
@@ -383,7 +417,7 @@ export class PiAgent extends Agent<Env> {
             },
             currentRunId,
         })
-        this.registry.install(branch_.extension)
+        registry.install(branch_.extension)
         const branchFiles = workspaceTools(getWorkspace(async () => {
             const work = this.ctx.storage.kv.get<ThreadWork>(THREAD_WORK_KEY)
             if (!work) throw new Error('No work branch is open: call branch_start first')
@@ -396,14 +430,22 @@ export class PiAgent extends Agent<Env> {
             callers: readToolCallers,
             writeAccess: { mayWrite: () => this.#runMayWrite(), refusedText: WRITE_REFUSED_TEXT },
         })
-        this.registry.install(branchFiles)
+        registry.install(branchFiles)
+        // `set_cron` and `remove_cron`: write tools, gated like the GitHub writes.
+        const crons = cronTools({
+            runMayWrite: () => this.#runMayWrite(),
+            setCron: (input) => this.#setCron(input),
+            removeCron: () => this.#removeCron(),
+            currentRunId,
+        })
+        registry.install(crons)
         const offeredToModel = (tool: ToolRegistration) => !tool.callers || tool.callers.includes('model')
-        this.#githubWriteTools = [...github_.writeTools, ...branch_.tools, ...(branchFiles.tools ?? []).filter(offeredToModel)]
+        this.#githubWriteTools = [...github_.writeTools, ...branch_.tools, ...(branchFiles.tools ?? []).filter(offeredToModel), ...(crons.tools ?? [])]
         // Code mode (requirement 16): the `codemode` tool next to the direct ones, and the caps on the
         // scripts one run may make and the nested calls they make. Nothing here runs when the flag is off.
         if (this.#codeModeEnabled) {
-            this.registry.install(codemodeExtension(this.env))
-            this.registry.install(defineExtension({
+            registry.install(codemodeExtension(this.env))
+            registry.install(defineExtension({
                 name: 'codemode-limits',
                 hooks: [hook(ToolTask, codemodeLimitHooks({
                     countCodemodeCall: (kind: CodemodeCallKind) => this.#countCodemodeCall(kind),
@@ -413,6 +455,91 @@ export class PiAgent extends Agent<Env> {
                 }))],
             }))
         }
+        // The same tool registrations over MCP: the reads, and the writes pi offers a writer plus
+        // `branch_write_files`, which `mcp-tools.ts` refuses for a task that may not write.
+        this.#mcpTools = mcpTools({
+            tools: servedTools({
+                read: [repoFiles, prFiles, github_.read, this.#webTools.extension].flatMap((extension) => extension.tools ?? []),
+                write: [...this.#githubWriteTools, branch_.writeFilesTool],
+            }),
+            codemode: this.#codeModeEnabled
+                ? { sandbox: (tools) => scriptSandbox(this.env, tools), countCodemodeCall: (kind) => this.#countCodemodeCall(kind) }
+                : undefined,
+        })
+    }
+
+    /**
+     * Starts a tool task for the run working now and returns its token: the only thing a harness
+     * outside the Worker (Claude Code's container) gets to call Benny's tools with. Its record holds
+     * what `#configureToolAccess` decided for the run, and is stored under the token's hash; the
+     * access comes back too, for the harness's log. `writeTools` narrows the write tools the task may
+     * call below the run's (`McpTask.writeTools`). Clears the records that expired, so storage holds
+     * only live ones.
+     */
+    async #newTaskToken(writeTools?: readonly string[]): Promise<{ token: string; access: ToolTaskAccess }> {
+        const runId = await this.#currentRunId()
+        const access = this.ctx.storage.kv.get<RunToolAccess>(RUN_TOOL_ACCESS_KEY)
+        if (!runId || !access || access.runId !== runId) throw new Error('No run is working: a tool task belongs to a run')
+        const now = Date.now()
+        for (const [key, record] of this.ctx.storage.kv.list<McpTask>({ prefix: TASK_TOKEN_KEY_PREFIX })) {
+            if (record.expiresAt <= now) this.ctx.storage.kv.delete(key)
+        }
+        const threadId = this.ctx.storage.kv.get<string>(THREAD_ID_KEY)
+        if (!threadId) throw new Error('This thread has no request yet')
+        const token = await newTaskToken(threadId, this.env.GITHUB_WEBHOOK_SECRET!)
+        // A run pauses at `RUN_LIMIT_MS`, so no task of it needs its token for longer.
+        const taskAccess: ToolTaskAccess = { runId, mayWrite: access.mayWrite, canRunCode: access.canRunCode, ...(writeTools ? { writeTools } : {}) }
+        this.ctx.storage.kv.put<McpTask>(await taskTokenKey(token), { ...taskAccess, expiresAt: now + RUN_LIMIT_MS })
+        log('tool task started', { runId, mayWrite: access.mayWrite, canRunCode: access.canRunCode, writeTools })
+        return { token, access: taskAccess }
+    }
+
+    /**
+     * The code a Claude Code task starts from: the work branch copy when one is open, so a whole-file
+     * `branch_write_files` cannot undo an earlier commit; otherwise the repo copy with the PR's
+     * files on top, as the sandbox gets. The key is read without reading the code.
+     */
+    async #agentWorkspace(): Promise<AgentWorkspace> {
+        const runId = await this.#currentRunId()
+        const work = this.ctx.storage.kv.get<ThreadWork>(THREAD_WORK_KEY)
+        if (work) {
+            return {
+                key: `branch:${work.branch}`,
+                copy: async () => ({ archive: (await (await this.#branchCopy(work.branch)).archive({ runId })).archive, prChanges: null }),
+            }
+        }
+        const repoName = await this.#repoName()
+        const prHead = await this.prChangesHead()
+        return {
+            key: `repo:${repoName}${prHead ? `+pr:${prHead}` : ''}`,
+            copy: async () => ({
+                archive: await (this.env.REPO as unknown as DurableObjectNamespace<RepoDO>).getByName(repoName).archive({ runId }),
+                prChanges: await this.#sandboxPrChanges(),
+            }),
+        }
+    }
+
+    /**
+     * One MCP request from a harness outside the Worker (`/mcp` in `index.ts`). The token is the only
+     * credential: it must name a task of the run working now, and the run's current access narrows
+     * the task's, so a task never does more than pi would for the same run.
+     */
+    async serveMcp(token: string, request: McpRequest): Promise<McpReply> {
+        const record = this.ctx.storage.kv.get<McpTask>(await taskTokenKey(token))
+        const runId = await this.#currentRunId()
+        const access = this.ctx.storage.kv.get<RunToolAccess>(RUN_TOOL_ACCESS_KEY)
+        if (!record || !access || record.expiresAt <= Date.now() || record.runId !== runId || access.runId !== runId) {
+            log('mcp token rejected', { method: request.method, runId, known: record !== undefined })
+            return unknownTaskReply(request)
+        }
+        const task: McpTask = { ...record, mayWrite: record.mayWrite && access.mayWrite, canRunCode: record.canRunCode && access.canRunCode }
+        return answerMcpRequest(this.#mcpTools, task, request, `mcp-${crypto.randomUUID()}`)
+    }
+
+    /** Every pending request of the run comes from a writer: the gate for running code (requirement 37). */
+    async #everyRequestFromWriter(): Promise<boolean> {
+        const pendingRequests = Object.values(await this.#pendingRequests())
+        return pendingRequests.length > 0 && pendingRequests.every((request) => request.hasWriteAccess === true)
     }
 
     /**
@@ -522,6 +649,250 @@ export class PiAgent extends Agent<Env> {
         return counts[kind]
     }
 
+    /** The issue's cron, or undefined when it has none. */
+    #cron(): CronRecord | undefined {
+        return this.ctx.storage.kv.get<CronRecord>(CRON_KEY)
+    }
+
+    /** Saves the cron, and its copy in ChatStateDO. A failed copy is only logged: the cron here is the one that fires. */
+    async #saveCron(record: CronRecord): Promise<void> {
+        this.ctx.storage.kv.put<CronRecord>(CRON_KEY, record)
+        await saveCronCopy(record).catch((error) => log('cron copy failed', { threadId: record.threadId, cronId: record.id, error: String(error) }))
+    }
+
+    /**
+     * Puts the scheduled mark on the cron's issue while the cron will fire again (status active or
+     * failing), else takes it off (requirement 22). It never throws.
+     */
+    async #updateScheduledMark(cron: CronRecord, logIds: LogIds, scheduled = cron.status === 'active' || cron.status === 'failing'): Promise<void> {
+        const { owner, repo, prNumber } = github.decodeThreadId(cron.threadId)
+        await updateScheduledMark(() => this.#octokit(), { owner, repo, number: prNumber }, scheduled, { ...logIds, cronId: cron.id })
+    }
+
+    /** Sets the timer for the cron's first firing after `from`, and returns the record that names it. */
+    async #scheduleNextFiring(record: CronRecord, from: number): Promise<CronRecord> {
+        const [nextFiringAt] = nextFirings(record.expression, record.timezone, from)
+        const { id: scheduleId } = await this.schedule(new Date(nextFiringAt), 'fireCron', { cronId: record.id })
+        return { ...record, nextFiringAt, scheduleId }
+    }
+
+    /** `set_cron`: sets or replaces the issue's cron. A throw goes back to the model as the reason. */
+    async #setCron(input: CronInput): Promise<string> {
+        const thread = this.#thread()
+        if (thread.type !== 'issue') throw new Error('a cron lives in an issue, not a PR. Ask the requester to open an issue for it.')
+        const expression = input.expression.trim()
+        const title = input.title.trim()
+        const prompt = input.prompt.trim()
+        if (!title || !prompt) throw new Error('the title and the prompt must not be empty.')
+        const firingLimit = checkFiringLimit(input.firingLimit)
+        const now = Date.now()
+        // At least three times, so the reply shows the reader whether the schedule is the one they
+        // meant, and up to the limit, so it can name the last firing.
+        const upcoming = nextFirings(expression, input.timezone, now, Math.min(Math.max(3, firingLimit ?? 0), CHECKED_FIRINGS))
+        const previous = this.#cron()
+        // An ended cron counts toward no cap, so replacing one adds a cron.
+        if ((!previous || previous.status === 'ended') && (await countCrons()) >= MAX_CRONS) throw new Error(`${MAX_CRONS} crons exist already, the most Benny keeps. Remove one first.`)
+        // The run's first request asked for the cron; a request that joined it did not.
+        const creator = Object.values(await this.#pendingRequests()).find((request) => !request.joined)?.requester
+        if (!creator) throw new Error('the request that asked has no requester on record.')
+        // `#thread()` above found it, so it is there.
+        const threadId = this.ctx.storage.kv.get<string>(THREAD_ID_KEY)!
+        if (previous?.scheduleId) await this.cancelSchedule(previous.scheduleId)
+        const record = await this.#scheduleNextFiring({
+            id: crypto.randomUUID(),
+            threadId,
+            title, expression, timezone: input.timezone, prompt, creator,
+            status: 'active', nextFiringAt: null, failuresInARow: 0, firings: [], createdAt: now,
+            ...(firingLimit === undefined ? {} : { firingLimit }), countedFirings: 0,
+        }, now)
+        // The copy counts toward the cap, so here a failed copy fails the tool instead of being logged.
+        try {
+            await saveCronCopy(record)
+        } catch (error) {
+            if (record.scheduleId) await this.cancelSchedule(record.scheduleId)
+            throw error
+        }
+        this.ctx.storage.kv.put<CronRecord>(CRON_KEY, record)
+        const runId = await this.#currentRunId()
+        log('cron set', { threadId: record.threadId, runId, cronId: record.id, expression, timezone: input.timezone, firingLimit, replacedCronId: previous?.id })
+        await this.#updateScheduledMark(record, { runId })
+        const times = upcoming.map((at) => formatFiringTime(at, input.timezone))
+        return `Cron set: "${title}", \`${expression}\` in ${input.timezone}${previous ? ', replacing the cron this issue had' : ''}. ${firingLimitSentence(firingLimit, times)}`
+    }
+
+    /** `remove_cron`: the issue's cron fires no more. */
+    async #removeCron(): Promise<string> {
+        const record = this.#cron()
+        if (!record) return 'This issue has no cron.'
+        if (record.scheduleId) await this.cancelSchedule(record.scheduleId)
+        this.ctx.storage.kv.delete(CRON_KEY)
+        const runId = await this.#currentRunId()
+        await deleteCronCopy(record.threadId).catch((error) => log('cron copy failed', { threadId: record.threadId, runId, cronId: record.id, error: String(error) }))
+        log('cron removed', { threadId: record.threadId, runId, cronId: record.id })
+        await this.#updateScheduledMark(record, { runId }, false)
+        return `Cron "${record.title}" removed.`
+    }
+
+    /**
+     * The cron's timer; public because `schedule` calls it by name. Firings missed while Benny was
+     * down arrive as this one late call, and the next is counted from now, so they merge into one
+     * (requirement 9). It never throws: the scheduler retries a callback that throws, and each retry
+     * would set another timer.
+     */
+    async fireCron({ cronId }: { cronId: string }): Promise<void> {
+        const cron = this.#cron()
+        const firedAt = Date.now()
+        // A timer from a cron that was replaced, removed, paused or ended since, or a second timer for a
+        // time this cron already fired at: each firing moves `nextFiringAt` past now.
+        if (!cron || cron.id !== cronId || cron.status === 'paused' || cron.status === 'ended' || (cron.nextFiringAt !== null && cron.nextFiringAt > firedAt)) {
+            log('cron firing dropped', { threadId: cron?.threadId, cronId, currentCronId: cron?.id, nextFiringAt: cron?.nextFiringAt })
+            return
+        }
+        await this.#makeFiring(cron, firedAt)
+    }
+
+    /**
+     * Dev only (`src/dev-routes.ts`): fires the cron now, whatever its `nextFiringAt`, and returns
+     * the record after. Public because the route reaches it over RPC, so it checks
+     * `DEV_ROUTES_ENABLED` itself: any stub can call it, and in production it refuses. With `fail`
+     * no run starts; the firing is noted as failed, so the failure counting runs for real.
+     */
+    async fireCronNow({ fail = false }: { fail?: boolean }): Promise<CronRecord | null> {
+        if ((this.env.DEV_ROUTES_ENABLED as string) !== 'true') throw new Error('fireCronNow is a dev route and dev routes are off')
+        const cron = this.#cron()
+        if (!cron) return null
+        log('cron fired by the dev route', { threadId: cron.threadId, cronId: cron.id, status: cron.status, fail })
+        // A paused or ended cron fires no more, as at its timer.
+        if (cron.status === 'paused' || cron.status === 'ended') return cron
+        if (fail) {
+            await this.#recordFiring(cron.id, { at: Date.now(), outcome: 'failed', note: 'forced by the dev route' })
+        } else {
+            // The firing books the next timer; the one booked now would make a second for that time.
+            if (cron.scheduleId) await this.cancelSchedule(cron.scheduleId)
+            await this.#makeFiring(cron, Date.now())
+        }
+        return this.#cron() ?? null
+    }
+
+    /**
+     * One firing of the cron: `fireCron` at its timer, `fireCronNow` from the dev route. It sets the
+     * next firing first, so a failure below costs one firing, not the cron. It never throws.
+     */
+    async #makeFiring(cron: CronRecord, firedAt: number): Promise<void> {
+        const { threadId, id: cronId } = cron
+        try {
+            await this.#saveCron(await this.#scheduleNextFiring(cron, firedAt))
+        } catch (error) {
+            log('cron next firing not set', { threadId, cronId, error: String(error) })
+        }
+        // The note is a phrase the reader can see: the cron list shows it, and so does the line a
+        // skip posts when it ends a limited cron (`#recordFiring`).
+        const skip = async (note: string) => {
+            log('cron firing skipped', { threadId, cronId, note })
+            await this.#recordFiring(cronId, { at: firedAt, outcome: 'skipped', note })
+        }
+        // The firing comment is the request (requirement 6); the status comment follows it, as for a person's request.
+        let requestId: string | undefined
+        let statusId: string | undefined
+        try {
+            const { owner, repo, number } = this.#thread()
+            const octokit = await this.#octokit()
+            // A closed issue skips its firings, and reopening it resumes them, with none made up (requirement 4).
+            const { data: issue } = await octokit.issues.get({ owner, repo, issue_number: number })
+            if (issue.state === 'closed') return await skip('the issue is closed')
+            if (Object.keys(await this.#pendingRequests()).length > 0) return await skip('the last run is still going')
+            // Checked at each firing: a creator who lost write access gets the read tools only
+            // (requirement 7). As in `bot.ts`, a failing check counts as no write access.
+            let creatorMayWrite = false
+            try {
+                const { data: access } = await octokit.repos.getCollaboratorPermissionLevel({ owner, repo, username: cron.creator })
+                creatorMayWrite = access.permission === 'admin' || access.permission === 'write'
+            } catch (error) {
+                log('write access check failed', { threadId, cronId, user: cron.creator, error: String(error) })
+            }
+
+            // This post is what counts toward a firing limit (`#recordFiring`); the last one says so.
+            requestId = await postInIssue(threadId, `⏰ Firing: ${cron.title}${lastFiringNote(cron)}`)
+            await this.#recordFiring(cronId, { at: firedAt, outcome: 'running', requestId })
+            statusId = await postStatus(threadId, requestId)
+            const { token } = (await octokit.auth({ type: 'installation' })) as { token: string }
+            await checkRepoSize(octokit, owner, repo, requestId)
+            const repoStub = (this.env.REPO as unknown as DurableObjectNamespace<RepoDO>).getByName(repoObjectName(owner, repo))
+            const { commit } = await repoStub.sync({ owner, repo, token, logIds: { requestId } })
+            await this.useRepo({ owner, repo })
+            const prompt = [
+                `Cron firing: "${cron.title}", set up by @${cron.creator}, fired at ${formatFiringTime(firedAt, cron.timezone)}. ` +
+                    'Nobody is waiting for a live answer, so put everything in the reply.',
+                `Request from @${cron.creator}:\n${cron.prompt}`,
+                `Repository: ${owner}/${repo} at commit ${commit}`,
+            ].join('\n\n')
+            await this.start({
+                threadId, requestMessageId: requestId, statusId, prompt, commit, prHead: null,
+                requestText: cron.prompt, hasWriteAccess: creatorMayWrite, mentionsBenny: true,
+                installationId: this.ctx.storage.kv.get<number>(INSTALLATION_ID_KEY) ?? 0,
+                requester: cron.creator, cronId,
+            })
+            log('cron fired', { threadId, cronId, requestId, creatorMayWrite })
+        } catch (error) {
+            // `start` refuses a firing while a run is going (requirement 8): a request that came in
+            // during the steps above. That firing is skipped, not failed.
+            const busy = error instanceof ConversationBusy || (error instanceof Error && error.name === 'ConversationBusy')
+            const reason = busy ? 'a run was already going in this issue' : error instanceof Error ? error.message : String(error)
+            log('cron firing failed', { threadId, cronId, requestId, error: reason })
+            if (requestId && statusId) {
+                await reportFailure({ threadId, requestMessageId: requestId, statusId, reason })
+                    .catch((reportError) => log('request report failed', { requestId, error: String(reportError) }))
+            }
+            await this.#recordFiring(cronId, { at: firedAt, outcome: busy ? 'skipped' : 'failed', requestId, note: reason.slice(0, 200) })
+                .catch((recordError) => log('cron firing not noted', { threadId, cronId, requestId, error: String(recordError) }))
+        }
+    }
+
+    /**
+     * Notes how a firing went on its cron and counts the failures in a row: two mark the cron
+     * Failing, five pause it with a comment in the issue (requirement 11). A firing of a cron that
+     * was replaced since changes nothing. A `running` firing (its comment was posted) counts toward
+     * the firing limit, and so does a skip of a limited cron; the last one ends the cron
+     * (requirement 20), and a skip that ends it posts one line saying so.
+     */
+    async #recordFiring(cronId: string, firing: CronFiring): Promise<void> {
+        const cron = this.#cron()
+        if (!cron || cron.id !== cronId) return
+        const failuresInARow = firing.outcome === 'failed' ? cron.failuresInARow + 1
+            : firing.outcome === 'replied' ? 0
+            : cron.failuresInARow
+        // A paused or ended cron keeps its status; failures neither revive nor pause it.
+        const stopped = cron.status === 'paused' || cron.status === 'ended'
+        let record: CronRecord = {
+            ...cron,
+            firings: withFiring(cron.firings, firing),
+            failuresInARow,
+            status: stopped ? cron.status : failuresInARow >= FAILING_AFTER ? 'failing' : 'active',
+        }
+        if (countsTowardLimit(cron, firing)) {
+            record = withCountedFiring(record)
+            if (record.status === 'ended') {
+                // A timer left behind is harmless (`fireCron` drops an ended cron's), so a failed cancel is only logged.
+                if (cron.scheduleId) await this.cancelSchedule(cron.scheduleId).catch((error) => log('cron timer not cancelled', { threadId: cron.threadId, cronId, error: String(error) }))
+                log('cron ended', { threadId: cron.threadId, cronId, requestId: firing.requestId, firingLimit: cron.firingLimit, outcome: firing.outcome })
+                if (firing.outcome === 'skipped') {
+                    await postInIssue(cron.threadId, skippedLastFiringNote(cron, firing.note ?? 'it was skipped'))
+                        .catch((error) => log('cron skip note failed', { threadId: cron.threadId, cronId, error: String(error) }))
+                }
+            }
+        }
+        if (failuresInARow >= PAUSE_AFTER && !stopped) {
+            if (cron.scheduleId) await this.cancelSchedule(cron.scheduleId)
+            record = { ...record, status: 'paused', nextFiringAt: null, scheduleId: undefined }
+            await postInIssue(cron.threadId, `⏸ I paused the cron "${cron.title}" after ${PAUSE_AFTER} failed firings in a row. Mention me to set it again.`)
+                .catch((error) => log('cron pause note failed', { threadId: cron.threadId, cronId, error: String(error) }))
+        }
+        await this.#saveCron(record)
+        log('cron firing noted', { threadId: cron.threadId, cronId, requestId: firing.requestId, outcome: firing.outcome, failuresInARow, status: record.status })
+        // Ended or paused just now: the cron fires no more until it is set again.
+        if (!stopped && (record.status === 'ended' || record.status === 'paused')) await this.#updateScheduledMark(record, { requestId: firing.requestId })
+    }
+
     /** This thread's sandbox: one per thread, named by this agent's id (requirement 39). */
     #sandbox(): SandboxClient {
         return sandboxClient(this.env, this.ctx.id.toString())
@@ -596,7 +967,7 @@ export class PiAgent extends Agent<Env> {
      * itself. A request that arrives while a run is working joins that run, so its one reply
      * answers every request in it; an idle thread starts a new run for this request.
      */
-    async start({ threadId, requestMessageId, statusId, prompt, commit, prHead, hasWriteAccess, mentionsBenny, installationId, requester, requestText }: BennyRequest): Promise<void> {
+    async start({ threadId, requestMessageId, statusId, prompt, commit, prHead, hasWriteAccess, mentionsBenny, installationId, requester, requestText, cronId }: BennyRequest): Promise<void> {
         // The links this request may read come from the requester's own comment only, and a new run
         // forgets the links and the web budget of the run before it (requirement 52). The id is
         // read and set with no `await` between, so of two starts on an idle object only the first
@@ -614,15 +985,13 @@ export class PiAgent extends Agent<Env> {
         }
         // Same rule for the run's GitHub writes: a request that joins keeps the run's count.
         if (startsRun) this.ctx.storage.kv.put<RunWriteCounts>(RUN_WRITES_KEY, NO_RUN_WRITES)
-        if (startsRun) this.ctx.storage.kv.delete(RUN_ASKS_INPUT_KEY)
         // And for the token of each other repo a read names: a new run finds it again.
         if (startsRun) this.#repoOctokits.clear()
         // The GitHub tools get a fresh installation token at each call from this id; it is not a
         // secret, and a token would expire mid-thread (batch 5 spike).
         this.ctx.storage.kv.put<number>(INSTALLATION_ID_KEY, installationId)
         this.ctx.storage.kv.put<string>(THREAD_ID_KEY, threadId)
-        const session = this.harness.session()
-        const transcriptCountBefore = (await session.messages()).length
+        const transcriptCountBefore = await this.#harness.messageCount()
         // The lines before the submit need the run too, and only the submit tells a joiner from the
         // run's first request. A request that starts a run has just named it, and one that joins
         // finds it in that run's pending requests; its own comment id is the fallback that keeps
@@ -639,7 +1008,9 @@ export class PiAgent extends Agent<Env> {
             const hasWorkBranch = this.ctx.storage.kv.get<ThreadWork>(THREAD_WORK_KEY) !== undefined
             await this.#sandbox().setSources({ prChanges: hasWorkBranch ? null : prChanges, runId })
             await this.#configureToolAccess({ threadId, hasWriteAccess, mentionsBenny, runId })
-            submitted = await this.#submitRequest(prompt)
+            // A person's request joins the running run, or leads a run of its own; `joined` says which.
+            // A cron's firing never joins: the harness throws `ConversationBusy` while a run works, and `fireCron` skips it.
+            submitted = cronId ? { ...(await this.#harness.startRunWhenIdle(prompt)), joined: false } : await this.#harness.submit(prompt)
         } catch (error) {
             // Nothing was submitted, so the run this request would have started is not active.
             if (startsRun) this.#runId = undefined
@@ -665,6 +1036,8 @@ export class PiAgent extends Agent<Env> {
                 hasWriteAccess,
                 mentionsBenny,
                 requester,
+                requestText,
+                ...(cronId ? { cronId } : {}),
                 startedAt: leader?.startedAt ?? Date.now(),
                 transcriptCountBefore: leader?.transcriptCountBefore ?? transcriptCountBefore,
                 ...(joined ? { joined: true, leaderOperationId: leaderEntry?.[0] } : {}),
@@ -691,49 +1064,25 @@ export class PiAgent extends Agent<Env> {
     }
 
     /**
-     * Offers the model the sandbox tools only when the run this request joins may run code: every
+     * Offers the model the sandbox tools (and `claude_code`) only when the run this request joins may run code: every
      * request working on the thread is from a writer, and so is this one (requirement 37). A call
      * still refuses on its own, so a failure here costs a step, not the request.
      */
     async #configureToolAccess({ threadId, hasWriteAccess, mentionsBenny, runId }: {
         threadId: string; hasWriteAccess: boolean; mentionsBenny: boolean; runId: string
     }): Promise<void> {
-        const pendingRequests = Object.values(await this.#pendingRequests())
         // A request that joins counts with the run it joins. On an idle thread the map is empty, so
-        // it is this request alone.
-        const canRunCode = hasWriteAccess && pendingRequests.every((request) => request.hasWriteAccess === true)
-        // GitHub writes also need a mention on every request (plan 4.1): a follow-up the decision
-        // model answers gets the read tools only.
-        const mayWrite = canRunCode && mentionsBenny && pendingRequests.every((request) => request.mentionsBenny === true)
-        const hidden = [...(canRunCode ? [] : this.#sandboxTools), ...(mayWrite ? [] : this.#githubWriteTools)]
+        // it is this request alone. GitHub writes also need a mention on every request (plan 4.1): a
+        // follow-up the decision model answers gets the read tools only.
+        const { canRunCode, mayWrite } = toolAccessFor(Object.values(await this.#pendingRequests()), { hasWriteAccess, mentionsBenny })
+        this.ctx.storage.kv.put<RunToolAccess>(RUN_TOOL_ACCESS_KEY, { runId, mayWrite, canRunCode })
+        const hidden = [...(canRunCode ? [] : [...this.#sandboxTools, ...this.#claudeCodeTools]), ...(mayWrite ? [] : this.#githubWriteTools)]
         try {
-            const root = await (await this.harness.pi()).root(BACKGROUND_CONTEXT)
-            // `null` offers every tool the model may call again; tools with `callers: ['tools']` stay hidden (code mode).
-            await root.configure({ modelTools: hidden.length === 0 ? null : { remove: hidden } }, BACKGROUND_CONTEXT)
+            await this.#harness.hideTools(hidden.map((tool) => tool.name))
         } catch (error) {
             log('tool access update failed', { threadId, runId, error: String(error) })
         }
         log('tool access', { threadId, runId, canRunCode, mayWrite })
-    }
-
-    /**
-     * Submits one request to the model: it joins the work of a running request, or leads a run of its
-     * own. `joined` says which happened.
-     */
-    async #submitRequest(prompt: string): Promise<{ operationId: string; joined: boolean }> {
-        const session = this.harness.session()
-        try {
-            // One step joins the running work or is refused, so it cannot race the run's end.
-            const { operationId } = await session.submit(prompt, { whenBusy: 'steer', whenIdle: 'reject' })
-            return { operationId, joined: true }
-        } catch (error) {
-            // A second copy of pi-durable in the bundle would break `instanceof`, so the name counts too.
-            const idle = error instanceof ConversationIdle || (error instanceof Error && error.name === 'ConversationIdle')
-            if (!idle) throw error
-            // Nothing was running, so this request leads a run of its own.
-            const { operationId } = await session.submit(prompt)
-            return { operationId, joined: false }
-        }
     }
 
     /** Aborts every running and queued request in this thread. True when something was running. */
@@ -746,7 +1095,7 @@ export class PiAgent extends Agent<Env> {
             }
             return operationIds.length > 0
         })
-        await this.harness.session().abort()
+        await this.#harness.abort()
         return Object.keys(pendingRequests).length > 0
     }
 
@@ -784,7 +1133,7 @@ export class PiAgent extends Agent<Env> {
             })
             if (!marked[operationId]) continue
             // No id: abort the whole run, so its followers stop with their leader.
-            await this.harness.session().abort()
+            await this.#harness.abort()
             // The paused mark decides the text, and a follower shows the same text.
             const pausedMarkSet = await reportPaused({
                 threadId: request.threadId,
@@ -841,8 +1190,7 @@ export class PiAgent extends Agent<Env> {
 
     /** Waits for one submitted request and reports how it ended. The pending request makes this run once. */
     async #waitForAnswerAndReport(operationId: string): Promise<void> {
-        const session = this.harness.session()
-        const result = await session.wait(operationId).catch(async (error) => {
+        const result = await this.#harness.wait(operationId).catch(async (error) => {
             // The pending request stays, so the next check waits for the operation again.
             const pendingRequest = (await this.#pendingRequests())[operationId]
             log('request wait failed', { ...requestLogIds(pendingRequest), operationId, error: String(error) })
@@ -870,66 +1218,27 @@ export class PiAgent extends Agent<Env> {
             statusId: request.statusId,
         }
 
+        // How a cron's firing ended, noted on the cron below; undefined while its answer is still coming.
+        let firingOutcome: FiringOutcome | undefined
         if (result.status === 'done') {
+            firingOutcome = 'replied'
             // A follower that joined in time gets the leader's answer, which the leader posts. One
             // that came as the run was answering got a run of its own, and its answer differs.
             const leaderAnswer = request.joined && request.leaderOperationId
-                ? (await session.wait(request.leaderOperationId).catch(() => undefined))?.text
+                ? (await this.#harness.wait(request.leaderOperationId).catch(() => undefined))?.text
                 : undefined
             if (request.joined && leaderAnswer === result.text) {
                 await reportSafely(operationId, request, () => reportFollowerEnded({ ...requestIds, end: { kind: 'answered' } }))
             } else {
                 const usage: RequestUsage = {
                     ms: Date.now() - request.startedAt,
-                    tokensIn: 0, cachedTokensIn: 0, tokensOut: 0, toolCalls: 0, webSearches: 0, webFetches: 0,
-                    turns: 0, peakContextTokens: 0,
-                    sandboxCalls: 0, sandboxWallMs: 0, sandboxStarts: 0, sandboxInstallMs: 0,
+                    ...await this.#harness.usageSince(request.transcriptCountBefore),
                 }
-                // A sandbox call's span on the clock, so parallel calls that waited on the same start
-                // count that wait once.
-                const sandboxIntervals: SandboxInterval[] = []
-                // A result from before `sandboxStartedAt` was stored has no place on the clock, so its
-                // own time is added alone: whether it overlapped the others is unknown.
-                let sandboxMsWithoutStart = 0
-                for (const entry of (await session.messages()).slice(request.transcriptCountBefore)) {
-                    for (const message of entry.model ?? []) {
-                        if (message.role === 'toolResult') {
-                            // A sandbox tool's result says what its call did there, a failed call too; a
-                            // refused call, and a result from before the footnote counted this, has none.
-                            const sandboxCall = this.#sandboxToolNames.has(message.toolName)
-                                ? message.details as Partial<SandboxDetails> | undefined
-                                : undefined
-                            if (typeof sandboxCall?.sandboxMs === 'number') {
-                                usage.sandboxCalls += 1
-                                usage.sandboxInstallMs += sandboxCall.installMs ?? 0
-                                if (typeof sandboxCall.sandboxStartedAt === 'number') {
-                                    sandboxIntervals.push({ start: sandboxCall.sandboxStartedAt, end: sandboxCall.sandboxStartedAt + sandboxCall.sandboxMs })
-                                } else {
-                                    sandboxMsWithoutStart += sandboxCall.sandboxMs
-                                }
-                                if (sandboxCall.started === true) usage.sandboxStarts += 1
-                            }
-                        }
-                        if (message.role !== 'assistant') continue
-                        // One assistant message is one turn, and every turn sent the whole context
-                        // again: the largest of those sends is the context the request reached.
-                        const contextTokens = message.usage.input + message.usage.cacheRead + message.usage.cacheWrite
-                        usage.turns += 1
-                        usage.tokensIn += contextTokens
-                        usage.cachedTokensIn += message.usage.cacheRead
-                        usage.tokensOut += message.usage.output
-                        usage.peakContextTokens = Math.max(usage.peakContextTokens, contextTokens)
-                        for (const block of message.content) {
-                            if (block.type !== 'toolCall') continue
-                            // Every call the model made, refused ones too: a refusal happens before Exa,
-                            // so the footnote shows the attempts.
-                            usage.toolCalls += 1
-                            if (block.name === 'web_search') usage.webSearches += 1
-                            if (block.name === 'web_fetch') usage.webFetches += 1
-                        }
-                    }
-                }
-                usage.sandboxWallMs = mergedIntervalsMs(sandboxIntervals) + sandboxMsWithoutStart
+                // Only a run whose requests all come from writers may get the waiting mark (plan rule 4):
+                // `canRunCode` says so for the run, as decided when its latest request came. Read before
+                // the reply goes out, while no new run can have replaced it.
+                const runAccess = this.ctx.storage.kv.get<RunToolAccess>(RUN_TOOL_ACCESS_KEY)
+                const mayMarkWaiting = runAccess?.runId === pendingRunId(request) && runAccess.canRunCode
                 await reportSafely(operationId, request, async () => {
                     try {
                         await reportReply({
@@ -939,12 +1248,18 @@ export class PiAgent extends Agent<Env> {
                             commit: request.commit,
                             prHead: request.prHead ?? null,
                         })
-                        // The reply that asks is on GitHub now, so the thread can show it waits.
-                        if (this.ctx.storage.kv.get<boolean>(RUN_ASKS_INPUT_KEY)) {
-                            this.ctx.storage.kv.delete(RUN_ASKS_INPUT_KEY)
-                            await this.#markWaiting(this.#thread().number, pendingRunId(request), 'reply asks')
+                        // The reply is on GitHub now, so a slow or failed decision model never delays it.
+                        // It, not the writing model, says whether the reply waits (plan rule 1).
+                        if (mayMarkWaiting && result.text) {
+                            const waits = await askReplyWaits({
+                                requestText: request.requestText ?? '',
+                                replyText: result.text,
+                                logIds: requestLogIds(request),
+                            })
+                            if (waits) await this.#markWaiting(this.#thread().number, pendingRunId(request), 'reply asks')
                         }
                     } catch (error) {
+                        firingOutcome = 'failed'
                         // The status comment still says "working", so the reader must hear that the
                         // reply did not make it.
                         await reportFailure({ ...requestIds, reason: `could not post the reply: ${String(error)}` })
@@ -952,8 +1267,11 @@ export class PiAgent extends Agent<Env> {
                 })
             }
         } else if (request.endReason === 'paused') {
+            // A firing that hits the 30-minute limit fails, so a cron that always times out pauses.
+            firingOutcome = 'failed'
             // `checkPendingRequests` reports a pause, the run's leader and its followers together.
         } else if (request.endReason === 'stopped') {
+            firingOutcome = 'stopped'
             if (request.joined) {
                 await reportSafely(operationId, request, () => reportFollowerEnded({ ...requestIds, end: { kind: 'stopped' } }))
             } else {
@@ -966,10 +1284,12 @@ export class PiAgent extends Agent<Env> {
             // A run that used every tool step still owes an answer: ask for one from what it found.
             // Only a summary that runs out of steps too reports the limit as a failure.
             if (!(await this.#summarise(request))) {
+                firingOutcome = 'failed'
                 await reportSafely(operationId, request, () => reportFailure({ ...requestIds, reason: 'turn_limit' }))
             }
         } else {
             const reason = result.reason ?? 'unknown error'
+            firingOutcome = 'failed'
             if (request.joined) {
                 await reportSafely(operationId, request, () => reportFollowerEnded({ ...requestIds, end: { kind: 'failed', reason } }))
             } else {
@@ -978,6 +1298,9 @@ export class PiAgent extends Agent<Env> {
                 await this.#endUnsettledFollowers(reason)
                 await reportSafely(operationId, request, () => reportFailure({ ...requestIds, reason }))
             }
+        }
+        if (request.cronId && firingOutcome) {
+            await this.#recordFiring(request.cronId, { at: request.startedAt, outcome: firingOutcome, requestId: request.requestMessageId })
         }
         log('request finished', { ...requestLogIds(request), operationId, status: result.status, reason: result.reason })
     }
@@ -1005,7 +1328,7 @@ export class PiAgent extends Agent<Env> {
                 statusId: follower.statusId,
                 end: { kind: 'failed', reason },
             }))
-            await this.harness.session().abort(operationId).catch((error) => {
+            await this.#harness.abort(operationId).catch((error) => {
                 log('request follower withdraw failed', { ...requestLogIds(follower), operationId, error: String(error) })
             })
         }
@@ -1020,7 +1343,7 @@ export class PiAgent extends Agent<Env> {
         try {
             // `reject`: if a new request started a run in the meantime, the summary must not join
             // it and answer under the wrong request; the caller then reports the limit instead.
-            const { operationId } = await this.harness.session().submit(SUMMARY_PROMPT, { whenBusy: 'reject' })
+            const { operationId } = await this.#harness.startRunWhenIdle(SUMMARY_PROMPT)
             await this.#updatePendingRequests((pendingRequests) => {
                 // The same request keeps its comment, its reply's footnote and the run's clock;
                 // only its operation is new. No `hasWriteAccess`: the sandbox stopped with the run's
@@ -1033,7 +1356,9 @@ export class PiAgent extends Agent<Env> {
                     runId: pendingRunId(request),
                     startedAt: request.startedAt,
                     transcriptCountBefore: request.transcriptCountBefore,
+                    ...(request.requestText !== undefined ? { requestText: request.requestText } : {}),
                     isSummary: true,
+                    ...(request.cronId ? { cronId: request.cronId } : {}),
                 }
                 return true
             })
@@ -1115,6 +1440,6 @@ export class PiAgent extends Agent<Env> {
     }
 
     async isNew() {
-        return (await this.harness.messages()).length === 0
+        return (await this.#harness.messageCount()) === 0
     }
 }

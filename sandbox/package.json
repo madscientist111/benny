@@ -2,7 +2,7 @@
 	"name": "bobby-sandbox-dev",
 	"private": true,
 	"type": "module",
-	"description": "The deployed sandbox Worker for `cf dev --mode remote-sandbox`. Its packages resolve from the repo root's node_modules.",
+	"description": "The deployed sandbox Worker that Benny in dev reaches. Its packages resolve from the repo root's node_modules.",
 	"scripts": {
 		"deploy": "cf deploy"
 	},

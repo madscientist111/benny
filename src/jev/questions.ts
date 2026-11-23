@@ -1,15 +1,20 @@
 // All Jev wording and thresholds live here, so they can be audited and tuned in one place.
-// Questions refer to fields of the state built in ./classify.ts by their backticked path.
+// Questions refer to fields of the state built in ./decide.ts by their backticked path.
 
 export const YES = 0.7
 export const NO = 0.3
+// In a solo thread right after Benny's message, `expects_answer` at or above this gets a reply:
+// "too long" and "huh" land at 0.51–0.56, "k" and "ok cool" at 0.39 or less (lesson 17).
+export const REPLY_AFTER_BENNY = 0.5
 
 export const ACK_REACTIONS = ['thumbs_up', 'heart', 'laugh', 'hooray', 'rocket'] as const
 export type AckReaction = (typeof ACK_REACTIONS)[number]
 
-// A wrong yes kills a running request, so a stop needs a clear answer, not a guess. Short
-// non-English commands score too low to count (docs/decision-model/tuning-lessons.md, lesson 15).
-export const STOP_YES = 0.85
+// A wrong yes kills a running request, so a stop needs a clear answer, not a guess. With Jev
+// every look-alike scores 0.10 or less. English stops score 0.92 or more; Hindi and Spanish ones
+// fell to 0.67–0.79 when the name became Benny while the handle stayed `@bobby-sb`
+// (docs/decision-model/tuning-lessons.md, lessons 16 and 20).
+export const STOP_YES = 0.6
 
 // Separate from `questions` so classify() requests keep their shape and cost.
 export const stopQuestions = {
@@ -19,6 +24,34 @@ export const stopQuestions = {
         criteria: {
             true: 'The author is telling Benny to stop, cancel, abandon, or abort the work it is doing now, in any wording, often because the request, the input, or the next step was wrong.',
             false: 'The author is not telling Benny to end its current work. The message asks about stopping something in the code or infrastructure, such as a server, a process, a loop, or a function named stop. It uses stop as part of a coding instruction about how the code should be written. Messages that tell Benny to continue working also do not count.',
+        },
+    },
+} as const
+
+// A posted reply waits for the requester (the waiting mark, docs/input-required/plan.md rule 1)
+// when either answer below is at or above this. On 146 hand-labeled real replies, two runs each:
+// 0 of 21 that wait missed, 2 of 95 that are done marked, 13 of 30 that could go either way
+// marked; 30 of 30 research replies that ended on questions marked. `asks_question` alone missed
+// one of those 30 (0.68, with `waits_for_go_ahead` at 0.94), so both are asked (lesson 18).
+export const REPLY_WAITS_YES = 0.7
+
+// Asked about Benny's reply once it is posted, so the writing model never has to choose to mark
+// it. Separate from `questions`, like `stopQuestions`.
+export const replyWaitQuestions = {
+    asks_question: {
+        type: 'noul',
+        instructions: 'Does `reply` ask the requester a question that Benny needs answered?',
+        criteria: {
+            true: 'Benny asks the requester to answer a question, choose between options, or confirm something, and the work depends on the answer.',
+            false: 'Benny reports what it found or did and asks the requester nothing.',
+        },
+    },
+    waits_for_go_ahead: {
+        type: 'noul',
+        instructions: 'Does `reply` propose a next step and wait for the requester to approve it?',
+        criteria: {
+            true: 'Benny says what it would do next and will only do it once the requester says yes.',
+            false: 'Benny has done what was asked and proposes nothing that needs approval.',
         },
     },
 } as const

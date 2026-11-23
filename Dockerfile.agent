@@ -1,0 +1,21 @@
+# The agent image (issue #61): the Claude Agent SDK, which bundles Claude Code, and the runner
+# `AgentDO` execs once per task. No token is baked in: the subscription token is the env of that
+# one exec. Claude Code refuses to skip permission prompts as root, so everything runs as `agent`.
+FROM node:24-trixie-slim
+
+# git for the model's own clones; procps for the `pkill` that `AgentDO.stopTask` sends.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates procps \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --uid 10001 --shell /bin/bash agent \
+    && mkdir -p /workspace /opt/runner \
+    && chown agent /workspace
+
+WORKDIR /opt/runner
+# Pinned: 0.3.328 is the version the spike proved with the subscription token.
+RUN npm install --no-audit --no-fund @anthropic-ai/claude-agent-sdk@0.3.328
+COPY agent/run.mjs /opt/runner/run.mjs
+
+USER agent
+CMD ["sleep", "infinity"]

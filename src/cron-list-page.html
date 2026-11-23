@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Benny crons</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<!--
+  The cron list (docs/crons/plan.md, requirements 12-18), served by src/cron-list.ts at /crons.
+  It reads GET /api/crons once per load and filters in the browser; the filter and the search live
+  in the URL. Tokens and classes come from the Benny Design System (prefix bb-).
+-->
+<!-- benny-design.css -->
+<style>
+/* What only the cron list uses: its row columns and cells. The rest is in src/benny-design.css. */
+.bb-list-head, .bb-row { grid-template-columns: minmax(0, 1fr) 300px 124px 64px 96px; }
+.bb-status--ended { background: var(--surface-selected); color: var(--ink-3); }
+.bb-status--ended .bb-status__glyph { background: currentColor; }
+.bb-row__cell--next-soon { color: var(--accent); }
+.bb-schedule { display: inline-flex; align-items: baseline; gap: var(--space-1h); min-width: 0; max-width: 100%; white-space: nowrap; }
+.bb-schedule__words { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font: 400 13px/18px var(--font-sans); }
+.bb-schedule__zone { flex: none; color: var(--ink-3); font: 500 11px/16px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+.bb-row--quiet .bb-schedule__words { color: var(--ink-2); }
+.bb-runs { display: inline-flex; align-items: flex-end; gap: 3px; height: 16px; }
+.bb-run { width: 5px; box-sizing: border-box; border-radius: var(--radius-xs); }
+.bb-run--ok { height: 16px; background: var(--ok); }
+.bb-run--fail { height: 8px; background: var(--fail); }
+.bb-run--skipped { height: 16px; border: 1px solid var(--line-control); }
+.bb-run--running { height: 12px; background: var(--accent); }
+.bb-run--none { height: 2px; background: var(--line-control); }
+@media (max-width: 760px) {
+  .bb-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .bb-row__cell--next, .bb-row__cell--runs { display: none; }
+  .bb-row__cell--schedule { grid-column: 1; grid-row: 2; }
+}
+</style>
+</head>
+<body>
+<div class="bb-shell">
+  <nav class="bb-rail" aria-label="Destinations">
+    <div class="bb-rail__mark" aria-hidden="true">B</div>
+    <a class="bb-rail__item" href="/crons" aria-current="page" aria-label="Crons">
+      <svg class="bb-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </a>
+  </nav>
+  <main class="bb-sheet">
+    <header class="bb-page-header">
+      <div>
+        <h1 class="bb-page-header__title">Crons</h1>
+        <p class="bb-page-header__sub" id="summary">Loading…</p>
+      </div>
+    </header>
+    <div class="bb-toolbar">
+      <div class="bb-tabs" role="tablist" aria-label="Status" id="tabs"></div>
+      <label class="bb-search">
+        <svg class="bb-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input class="bb-search__input" id="search" type="search" placeholder="Search title, prompt, repo, issue" aria-label="Search crons">
+      </label>
+    </div>
+    <div id="list" aria-live="polite"></div>
+  </main>
+</div>
+<script>
+// Statuses in the order the tabs show them; "all" is no filter.
+const STATUSES = [
+  { id: 'all', label: 'All' },
+  { id: 'active', label: 'Active' },
+  { id: 'running', label: 'Running' },
+  { id: 'paused', label: 'Paused' },
+  { id: 'failing', label: 'Failing' },
+  { id: 'ended', label: 'Ended' },
+]
+const DAY_MS = 24 * 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
+const SHOWN_FIRINGS = 7
+const EXAMPLE_COMMENT = '@bobby-sb every weekday at 9am Asia/Kolkata, post a work digest for this repo: PRs merged in the last 24 hours, open PRs and what each waits on, and anything with no activity for 3+ days. Ten lines at most.'
+
+let crons = []
+const listElement = document.getElementById('list')
+const tabsElement = document.getElementById('tabs')
+const searchInput = document.getElementById('search')
+const summaryElement = document.getElementById('summary')
+
+// Builds an element; text always goes in as text, never as HTML, because titles and prompts come from GitHub comments.
+const element = (tag, attributes = {}, children = []) => {
+  const node = document.createElement(tag)
+  for (const [name, value] of Object.entries(attributes)) {
+    if (name === 'text') node.textContent = value
+    else node.setAttribute(name, value)
+  }
+  for (const child of children) if (child) node.append(child)
+  return node
+}
+
+const readFilters = () => {
+  const params = new URLSearchParams(location.search)
+  const status = params.get('status')
+  return { status: STATUSES.some((entry) => entry.id === status) ? status : 'all', query: params.get('q') ?? '' }
+}
+
+const writeFilters = ({ status, query }) => {
+  const params = new URLSearchParams()
+  if (status !== 'all') params.set('status', status)
+  if (query) params.set('q', query)
+  const search = params.toString()
+  history.replaceState(null, '', search ? `?${search}` : location.pathname)
+}
+
+// Under a day: "in 14 h", "3 h ago". After that: "Mon 23 Nov, 09:00" in the cron's timezone.
+const whenText = (at, timezone) => {
+  const difference = at - Date.now()
+  const distance = Math.abs(difference)
+  if (distance < DAY_MS) {
+    const amount = distance < HOUR_MS ? `${Math.max(1, Math.round(distance / 60000))} min` : `${Math.round(distance / HOUR_MS)} h`
+    return difference >= 0 ? `in ${amount}` : `${amount} ago`
+  }
+  return new Intl.DateTimeFormat('en-GB', { timeZone: timezone, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(at))
+}
+
+const statusBadge = (status) => {
+  const label = STATUSES.find((entry) => entry.id === status)?.label ?? status
+  return element('span', { class: `bb-status bb-status--${status}` }, [
+    element('span', { class: 'bb-status__glyph', 'aria-hidden': 'true' }),
+    label,
+  ])
+}
+
+// The last seven firings, oldest first; a cron with fewer shows flat bars for the missing ones.
+const firingBars = (firings) => {
+  const kinds = { replied: 'ok', failed: 'fail', skipped: 'skipped', stopped: 'skipped', running: 'running' }
+  const shown = firings.slice(-SHOWN_FIRINGS)
+  const bars = []
+  for (let index = shown.length; index < SHOWN_FIRINGS; index++) bars.push(element('span', { class: 'bb-run bb-run--none' }))
+  for (const firing of shown) bars.push(element('span', { class: `bb-run bb-run--${kinds[firing.outcome] ?? 'none'}`, title: `${firing.outcome}${firing.note ? `: ${firing.note}` : ''}` }))
+  const counts = shown.reduce((total, firing) => ({ ...total, [firing.outcome]: (total[firing.outcome] ?? 0) + 1 }), {})
+  const description = shown.length === 0 ? 'No firings yet' : Object.entries(counts).map(([outcome, count]) => `${count} ${outcome}`).join(', ')
+  return element('span', { class: 'bb-runs', role: 'img', 'aria-label': `Last firings: ${description}` }, bars)
+}
+
+// Paused and ended crons fire no more until set again: they look quiet and sort last.
+const isQuiet = (cron) => cron.status === 'paused' || cron.status === 'ended'
+
+const cronRow = (cron) => {
+  const nextText = isQuiet(cron) || cron.nextFiringAt === null ? '—' : whenText(cron.nextFiringAt, cron.timezone)
+  const soon = cron.nextFiringAt !== null && cron.nextFiringAt - Date.now() < HOUR_MS && !isQuiet(cron)
+  return element('li', {}, [
+    element('a', { class: `bb-row${isQuiet(cron) ? ' bb-row--quiet' : ''}`, href: cron.issueUrl, target: '_blank', rel: 'noopener' }, [
+      element('span', { class: 'bb-row__main' }, [
+        element('span', { class: 'bb-row__title', text: cron.title }),
+        element('span', { class: 'bb-chip', text: `${cron.repo.split('/')[1]} #${cron.issueNumber}` }),
+        element('span', { class: 'bb-row__preview', text: cron.prompt }),
+      ]),
+      element('span', { class: 'bb-row__cell bb-row__cell--schedule', title: cron.expression }, [
+        element('span', { class: 'bb-schedule' }, [
+          element('span', { class: 'bb-schedule__words', text: cron.scheduleWords }),
+          element('span', { class: 'bb-schedule__zone', text: cron.firingLimitWords ? `${cron.timezone} · ${cron.firingLimitWords}` : cron.timezone }),
+        ]),
+      ]),
+      element('span', { class: `bb-row__cell bb-row__cell--next${soon ? ' bb-row__cell--next-soon' : ''}`, text: nextText }),
+      element('span', { class: 'bb-row__cell bb-row__cell--runs' }, [firingBars(cron.firings)]),
+      element('span', { class: 'bb-row__end' }, [statusBadge(cron.status)]),
+    ]),
+  ])
+}
+
+const listHead = () => element('div', { class: 'bb-list-head', 'aria-hidden': 'true' }, [
+  element('span', { text: 'Cron' }), element('span', { text: 'Schedule' }), element('span', { text: 'Next firing' }),
+  element('span', { text: 'Last 7' }), element('span', { text: 'Status' }),
+])
+
+const matchesQuery = (cron, query) => {
+  if (!query) return true
+  const needle = query.toLowerCase().replace(/^#/, '')
+  return [cron.title, cron.prompt, cron.repo, String(cron.issueNumber), `#${cron.issueNumber}`]
+    .some((haystack) => haystack.toLowerCase().includes(needle))
+}
+
+// By next firing, soonest first; paused and ended crons go last.
+const byNextFiring = (first, second) => {
+  const firstQuiet = isQuiet(first) ? 1 : 0
+  const secondQuiet = isQuiet(second) ? 1 : 0
+  if (firstQuiet !== secondQuiet) return firstQuiet - secondQuiet
+  return (first.nextFiringAt ?? Infinity) - (second.nextFiringAt ?? Infinity)
+}
+
+const renderTabs = (activeStatus) => {
+  tabsElement.replaceChildren(...STATUSES.map(({ id, label }) => {
+    const count = id === 'all' ? crons.length : crons.filter((cron) => cron.status === id).length
+    const tab = element('button', { class: 'bb-tab', role: 'tab', type: 'button', 'aria-selected': String(id === activeStatus) }, [
+      label, element('span', { class: 'bb-tab__count', text: String(count) }),
+    ])
+    tab.addEventListener('click', () => {
+      writeFilters({ ...readFilters(), status: id })
+      render()
+    })
+    return tab
+  }))
+}
+
+const emptyState = (title, body, example) => element('div', { class: 'bb-empty' }, [
+  element('h2', { class: 'bb-empty__title', text: title }),
+  element('p', { class: 'bb-empty__body', text: body }),
+  example ? element('pre', { class: 'bb-empty__example', text: example }) : null,
+])
+
+const render = () => {
+  const { status, query } = readFilters()
+  renderTabs(status)
+  const paused = crons.filter((cron) => cron.status === 'paused').length
+  summaryElement.textContent = `${crons.length} cron${crons.length === 1 ? '' : 's'}${paused ? `, ${paused} paused` : ''}`
+  if (crons.length === 0) {
+    listElement.replaceChildren(emptyState('No crons yet', 'Mention Benny in a GitHub issue with a schedule and a prompt. Each firing posts in that issue.', EXAMPLE_COMMENT))
+    return
+  }
+  const shown = crons.filter((cron) => (status === 'all' || cron.status === status) && matchesQuery(cron, query)).sort(byNextFiring)
+  if (shown.length === 0) {
+    listElement.replaceChildren(emptyState('No crons match', 'Try another status or a different search.'))
+    return
+  }
+  listElement.replaceChildren(listHead(), element('ul', { class: 'bb-list' }, shown.map(cronRow)))
+}
+
+const renderLoading = () => {
+  const rows = Array.from({ length: 3 }, () => element('li', { class: 'bb-row', 'aria-hidden': 'true' }, [
+    element('span', { class: 'bb-skeleton', style: 'width: 60%' }), element('span', { class: 'bb-skeleton' }),
+    element('span', { class: 'bb-skeleton' }), element('span', { class: 'bb-skeleton' }), element('span', { class: 'bb-skeleton' }),
+  ]))
+  listElement.replaceChildren(listHead(), element('ul', { class: 'bb-list', 'aria-label': 'Loading crons' }, rows))
+}
+
+const renderError = (message) => {
+  summaryElement.textContent = 'Could not load'
+  const retry = element('button', { class: 'bb-button bb-button--secondary', type: 'button', text: 'Try again' })
+  retry.addEventListener('click', load)
+  listElement.replaceChildren(element('div', { class: 'bb-empty' }, [
+    element('h2', { class: 'bb-empty__title', text: 'The crons did not load' }),
+    element('p', { class: 'bb-empty__body', text: message }),
+    retry,
+  ]))
+}
+
+async function load() {
+  renderLoading()
+  try {
+    const response = await fetch('/api/crons', { headers: { accept: 'application/json' } })
+    if (!response.ok) throw new Error(`The server answered ${response.status}.`)
+    crons = (await response.json()).crons
+    render()
+  } catch (error) {
+    renderError(error instanceof Error ? error.message : String(error))
+  }
+}
+
+searchInput.value = readFilters().query
+searchInput.addEventListener('input', () => {
+  writeFilters({ ...readFilters(), query: searchInput.value.trim() })
+  render()
+})
+document.addEventListener('keydown', (event) => {
+  if (event.key === '/' && document.activeElement !== searchInput) {
+    event.preventDefault()
+    searchInput.focus()
+  }
+})
+load()
+</script>
+</body>
+</html>

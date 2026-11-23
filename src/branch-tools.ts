@@ -16,7 +16,8 @@ import type { SandboxClient } from './sandbox-contract'
 // push, and keep files a sandbox command changed. The file tools for the branch (`branch_read` ...
 // `branch_delete`) are `workspaceTools` over the branch copy; `PiAgent` installs both. Every tool
 // here changes something or exists for a change, so all of them are the model's only and need every
-// pending request to be a writer's mention.
+// pending request to be a writer's mention. `branch_write_files` is for a harness with files of its
+// own (Claude Code over MCP), so it is returned apart and pi is not offered it.
 
 /** What the branch tools ask `PiAgent` about the thread and the run. */
 export type BranchToolsAccess = {
@@ -37,6 +38,12 @@ export type BranchToolsAccess = {
 }
 
 type ToolOutput = { output: { type: 'text'; text: string }[]; isError: boolean }
+
+/**
+ * Most bytes one `branch_write_files` call sends to the branch copy: room for a 10 MiB lockfile and
+ * a few source files, and half the 32 MiB a Durable Object RPC call may carry.
+ */
+const MAX_WRITE_FILES_BYTES = 16 * 1024 * 1024
 
 class Refusal extends Error {}
 
@@ -202,5 +209,67 @@ export const branchTools = (access: BranchToolsAccess) => {
         }),
     ]
 
-    return { extension: defineExtension({ name: 'branch', tools }), tools }
+    // How code a harness wrote in its own container reaches the work branch (Claude Code, over MCP;
+    // `mcp-tools.ts`). pi writes into the branch copy directly with `branch_write`, so pi is not
+    // offered this tool. The copy's own checks (`BranchDO.keepFiles`) refuse workflow, secret,
+    // binary and oversized files; nothing reaches GitHub until `branch_commit_push`.
+    const writeFilesTool = defineTool({
+        name: 'branch_write_files',
+        description: `Write whole files into the work branch (after branch_start), and delete files from it, so the next branch_commit_push has them. ` +
+            `Send each changed file's full UTF-8 text; at most ${MAX_KEEP_PATHS} paths and ${MAX_WRITE_FILES_BYTES / (1024 * 1024)} MiB per call. Workflow, secret and binary files are refused.`,
+        callers: ['model'],
+        parameters: {
+            type: 'object',
+            properties: {
+                files: {
+                    type: 'array',
+                    description: 'Files to write, each replacing the branch\'s file at that path.',
+                    items: {
+                        type: 'object',
+                        properties: { path: { type: 'string', description: 'Path from the repo root, such as src/index.ts. /workspace/src/index.ts and /repo/src/index.ts mean the same file.' }, content: { type: 'string', description: 'The whole file, as UTF-8 text.' } },
+                        required: ['path', 'content'],
+                    },
+                },
+                deletedPaths: { type: 'array', items: { type: 'string' }, description: 'Paths from the repo root to delete from the branch.' },
+            },
+        },
+        execute: (args, api) => {
+            const { files = [], deletedPaths = [] } = args as { files?: { path: string; content: string }[]; deletedPaths?: string[] }
+            // The contents are whole files, so the tool's log line names only the paths.
+            return run('branch_write_files', { paths: files.map((file) => file.path), deletedPaths }, api.callId, async (logIds) => {
+                // Paths are repo-relative; `/workspace/...` (the container's copy, where Claude Code's own
+                // tools see the repo root) and `/repo/...` (Benny's read tools) are accepted too, so
+                // `/workspace/repo/x` is the repo's `repo/x`. A `..` segment or another absolute path could
+                // leave the repo, so it is refused.
+                const repoPath = (path: string) => {
+                    const relative = path.replace(/^\/(?:workspace|repo)\//, '').replace(/^\.\//, '')
+                    if (relative === '' || relative.startsWith('/') || relative.split('/').some((segment) => segment === '..' || segment === '')) {
+                        throw new Refusal(`"${path}" is not a path inside the repo.`)
+                    }
+                    return relative
+                }
+                const pathCount = files.length + deletedPaths.length
+                if (pathCount === 0) throw new Refusal('name at least one file to write or delete.')
+                if (pathCount > MAX_KEEP_PATHS) throw new Refusal(`at most ${MAX_KEEP_PATHS} paths per call; split the files over several calls.`)
+                const encoder = new TextEncoder()
+                const encoded = files.map((file) => ({ path: repoPath(file.path), content: encoder.encode(file.content) }))
+                const removedPaths = deletedPaths.map(repoPath)
+                const totalBytes = encoded.reduce((sum, file) => sum + file.content.byteLength, 0)
+                if (totalBytes > MAX_WRITE_FILES_BYTES) throw new Refusal(`these files hold ${totalBytes} bytes; at most ${MAX_WRITE_FILES_BYTES} per call. Split them over several calls.`)
+                const work = await requireWork()
+                const kept = await (await branchCopy(work.branch)).keepFiles({ files: encoded, removedPaths, logIds })
+                return [
+                    `Wrote ${kept.kept} of ${pathCount} paths in ${work.branch}. Commit them with branch_commit_push.`,
+                    kept.refused.length > 0 ? `Refused: ${kept.refused.map((file) => `${file.path} (${file.reason})`).join(', ')}.` : '',
+                ].filter(Boolean).join('\n')
+            })
+        },
+    })
+
+    return {
+        extension: defineExtension({ name: 'branch', tools }),
+        tools,
+        /** `branch_write_files`, served over MCP only: a harness with its own files sends them to the branch copy with it. */
+        writeFilesTool,
+    }
 }

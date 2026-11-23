@@ -1,5 +1,6 @@
 import type { RequestUsage } from './pi-agent'
 import { BOT_USERNAME, bot, github } from './bot'
+import { TASK_FAILURE_TEXTS } from './claude-code-run'
 import { log } from './log'
 import { appendToWindow } from './thread-window'
 
@@ -22,11 +23,18 @@ const pausedText = (marked: boolean) => marked
     ? '⏸ I worked for 30 min and stopped. A member with write access can reply in this thread to let me continue; mention me in that reply if the work changes GitHub.'
     : '⏸ I worked for 30 min and stopped. Mention me to continue.'
 
+/** A reason that is a raw JavaScript error (`Error: Peer closed WebSocket ...`, `TypeError: ...`) rather than words for people. */
+const RAW_ERROR = /^(?:[A-Z]\w*)?Error\b/
+
 const failureText = (reason: string) => {
     if (reason === 'turn_limit') return 'I stopped because I reached my limit of tool steps for one request. Ask a narrower question, or ask me to continue.'
-    // Only the first line, at most 200 characters: no tokens, headers or stack traces.
+    const taskFailureText = TASK_FAILURE_TEXTS[reason]
+    if (taskFailureText) return taskFailureText
+    // Only the first line, at most 200 characters: no tokens, headers or stack traces. A raw error is
+    // not shown at all; `request finished` and `reply failed` log it in full.
     const reasonFirstLine = reason.split('\n')[0].trim().slice(0, 200)
-    return `I could not finish this request because of an error: ${reasonFirstLine}. Please try again.`
+    const shownReason = RAW_ERROR.test(reasonFirstLine) ? 'something went wrong inside Benny' : reasonFirstLine
+    return `I could not finish this request because of an error: ${shownReason}. Please try again.`
 }
 
 // The reply footnote (requirements 22, 48), for example:
@@ -68,7 +76,9 @@ const formatFootnote = (usage: RequestUsage, commit: string | undefined, prHead:
     const tokenPart = `${usage.turns} turn${usage.turns === 1 ? '' : 's'}, ` +
         `${formatTokenCount(usage.peakContextTokens)} context ` +
         `(${formatTokenCount(usage.tokensIn)} sent${cachedPercent > 0 ? `, ${cachedPercent}% cached` : ''}), ` +
-        `${formatTokenCount(usage.tokensOut)} out`
+        `${formatTokenCount(usage.tokensOut)} out` +
+        // Only a harness that reports a cost (Claude Code) shows one; a subscription pays none of it.
+        (usage.costUsd !== undefined ? `, $${usage.costUsd.toFixed(2)} at list price` : '')
     // Which web tools the run used, in words. A count of 0 is left out, so a run that did no web
     // work says nothing about it.
     const webCallParts = [
@@ -83,9 +93,13 @@ const formatFootnote = (usage: RequestUsage, commit: string | undefined, prHead:
         ? ` · sandbox: ${usage.sandboxCalls} call${usage.sandboxCalls === 1 ? '' : 's'}, ${formatAgentTime(usage.sandboxWallMs)}` +
           (usage.sandboxStarts > 0 ? ` (${formatAgentTime(usage.sandboxInstallMs)} install)` : '')
         : ''
+    // The tasks pi handed to Claude Code (the `claude_code` tool), with their list-price cost.
+    const claudeCodePart = usage.claudeCodeTasks > 0
+        ? ` · Claude Code: ${usage.claudeCodeTasks} task${usage.claudeCodeTasks === 1 ? '' : 's'}, $${usage.claudeCodeCostUsd.toFixed(2)} at list price`
+        : ''
     return `<sub>Benny worked ${formatAgentTime(usage.ms)}${commitsRead} · ` +
         `${tokenPart} · ` +
-        `${usage.toolCalls} tool call${usage.toolCalls === 1 ? '' : 's'}${webCallsPart}${sandboxPart}</sub>`
+        `${usage.toolCalls} tool call${usage.toolCalls === 1 ? '' : 's'}${webCallsPart}${sandboxPart}${claudeCodePart}</sub>`
 }
 
 // One step after the comment that matters is already on GitHub (or a step of a failure report):

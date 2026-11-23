@@ -2,21 +2,31 @@
 	"name": "benny",
 	"private": true,
 	"type": "module",
+	"packageManager": "pnpm@11.1.1",
 	"scripts": {
 		"dev": "cf dev --port 8787",
-		"dev:remote-sandbox": "cf dev --port 8787 --mode remote-sandbox",
+		"dev:claude-code": "cf dev --port 8787 --mode claude-code",
+		"dev:claude-code-tool": "cf dev --port 8787 --mode claude-code-tool",
 		"sandbox:deploy": "cd sandbox && cf deploy",
+		"agent:deploy": "cd agent && cf deploy",
+		"agent:deploy:production": "cd agent && cf deploy --mode production",
 		"codemode-sandbox:deploy": "cd codemode-sandbox && cf deploy",
 		"build": "cf build",
-		"deploy": "cf deploy",
+		"deploy": "cf deploy --mode production",
 		"cf-typegen": "cf workers types",
 		"webhook:test": "node scripts/test-webhook.mjs",
 		"typecheck": "cf workers types && tsc",
-		"probe:decisions": "node --experimental-strip-types --no-warnings scripts/probe-decisions.ts"
+		"probe:decisions": "node --experimental-strip-types --no-warnings scripts/probe-decisions.ts",
+		"probe:check": "node --experimental-strip-types --no-warnings scripts/probe-decisions.ts --check",
+		"test": "node --experimental-strip-types --no-warnings --test 'tests/**/*.test.ts'",
+		"verify": "node scripts/verify.mjs",
+		"probe:mcp": "tsx scripts/probe-mcp.mjs",
+		"probe:claude-code-run": "tsx scripts/probe-claude-code-run.mjs"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "beta",
 		"cf": "^1.0.0-beta.18",
+		"fast-check": "^4.10.3",
 		"typescript": "^7.0.2",
 		"vite": "^8.3.0"
 	},
@@ -32,7 +42,10 @@
 		"agents": "^0.33.0",
 		"chat": "^4.44.0",
 		"chat-state-cloudflare-do": "^0.2.0",
+		"croner": "^9.1.0",
+		"cronstrue": "2.50.0",
 		"hono": "^4.13.18",
+		"jose": "5.9.6",
 		"just-bash": "^3.6.0"
 	}
 }

@@ -17,6 +17,7 @@
 	"include": [
 		"src",
 		"sandbox",
+		"agent",
 		"codemode-sandbox",
 		"cloudflare.config.ts",
 		".cloudflare/types"

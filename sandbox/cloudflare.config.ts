@@ -1,7 +1,7 @@
 import { bindings, defineConfig, defineContainer, exports } from "cf/config";
 import * as entrypoint from "../src/sandbox-worker.ts" with { type: "cf-worker" };
 
-// The sandbox Worker for `cf dev --mode remote-sandbox` (see `../cloudflare.config.ts`): the
+// The sandbox Worker that Benny in dev reaches (see `../cloudflare.config.ts`): the
 // same `SandboxDO`, container image and egress proxy as Benny's own, behind the `SandboxService`
 // RPC entrypoint. It holds none of Benny's secrets. Deploy: `npm run sandbox:deploy`.
 const sandbox = defineContainer({
