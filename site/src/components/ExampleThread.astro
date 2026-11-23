@@ -1,0 +1,23 @@
+---
+// The example issue thread shown in both pages' heroes: a request, Benny's reply with a question,
+// the go-ahead, then the branch and the pull request. Drawn in GitHub's look; the text is an example.
+// With `forTeam`, the repo is the visitor's own, a teammate gives the go-ahead and a teammate merges.
+interface Props {
+	forTeam?: boolean;
+}
+
+const { forTeam = false } = Astro.props;
+---
+
+<div class="ghub">
+  <div class="gh-top"><svg><use href="#i-gh"/></svg><span>{forTeam ? "your-org" : "madscientist111"} / <b>{forTeam ? "api" : "benny"}</b></span><span>Issues</span><span class="ex">Example thread</span></div>
+  <div class="gh-title"><h3>Dependency cache misses on every cold start <i>#53</i></h3><span class="gh-state"><svg><use href="#i-open"/></svg>Open</span></div>
+  <div class="gh-body">
+    <div class="gh-c"><img src="/art/you.webp" alt=""><div class="gh-box"><header><b>you</b> commented 12 minutes ago</header><div class="txt"><span class="gh-at">@benny</span> The dependency cache misses on every cold start, even when the lockfile is unchanged. Find out why and write the fix up as requirements on this issue.</div></div></div>
+    <div class="gh-c"><img class="bot" src="/art/pfp.jpg" alt=""><div class="gh-box"><header><b>benny</b><span class="gh-bot">bot</span> commented 8 minutes ago</header><div class="txt">I read the cache step and the last five cold starts. The cache key includes the build time, so it never matches. Proposed requirements:<ol><li>Key the cache on the lockfile hash only.</li><li>Add a test that a second start is a cache hit.</li></ol>One question: should the key include the Node version?</div></div></div>
+    <div class="gh-c"><img class:list={{ mate: forTeam }} src="/art/you.webp" alt=""><div class="gh-box"><header><b>{forTeam ? "your-teammate" : "you"}</b> commented 5 minutes ago</header><div class="txt">Sure, include it. Go ahead.</div></div></div>
+    <div class="gh-ev"><span class="ic blue"><svg><use href="#i-branch"/></svg></span><span><b>benny</b> created branch <code>benny/issue-53</code></span></div>
+    <div class="gh-ev"><span class="ic green"><svg><use href="#i-pr"/></svg></span><span><b>benny</b> opened pull request <b>Key the dependency cache on the lockfile</b> #54</span></div>
+    {forTeam && <div class="gh-ev"><span class="ic purple"><svg><use href="#i-branch"/></svg></span><span><b>your-teammate</b> reviewed and merged pull request #54</span></div>}
+  </div>
+</div>

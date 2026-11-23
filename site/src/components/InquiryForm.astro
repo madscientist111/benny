@@ -1,0 +1,66 @@
+---
+// The inquiry form on `/for-teams`. It posts to the separate, private `benny-inquiries` Worker,
+// which stores the inquiry and emails the owner. Both values below are public by nature: the
+// endpoint only accepts posts from this site, and the Turnstile site key only works on this hostname.
+const inquiryEndpoint = "https://inquiries.heyshoo.in/api/inquiries";
+const turnstileSiteKey = "0x4AAAAAAGPSoRGD5qUM-puX";
+---
+
+<section class="hire" id="ask"><div class="in grid">
+  <div>
+    <h2 class="sec-title">Get in touch</h2>
+    <p class="sec-lede">A short brief is enough: your team, your repositories and the work you want the agent to take on. I read every message myself and reply by email.</p>
+    <p class="sec-lede">I work independently, and Benny is the best example of my work. The code is <a href="https://github.com/madscientist111/benny">open</a> if you would like to review it first.</p>
+  </div>
+  <form class="hire-form" id="hire-form" data-endpoint={inquiryEndpoint} novalidate>
+    <label>Your name<input name="name" autocomplete="name" maxlength="120" required /></label>
+    <label>Work email<input name="email" type="email" autocomplete="email" maxlength="200" required /></label>
+    <label>Company<input name="company" autocomplete="organization" maxlength="160" required /></label>
+    <label>What would you like the agent to do?<textarea name="message" rows="4" maxlength="4000" required></textarea></label>
+    <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-theme="light" data-appearance="interaction-only" data-size="flexible"></div>
+    <button class="btn dark" type="submit">Send inquiry</button>
+    <p class="hire-note" id="hire-note" role="status" aria-live="polite"></p>
+  </form>
+</div></section>
+
+<script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
+<script is:inline>
+// The inquiry form: send the fields to the inquiries Worker and say what happened, in place.
+(function () {
+  var form = document.getElementById('hire-form');
+  var note = document.getElementById('hire-note');
+  if (!form) return;
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var fields = Object.fromEntries(new FormData(form));
+    if (!fields['cf-turnstile-response']) {
+      note.textContent = 'Still checking that you are a person. Wait a moment and press Send again.';
+      note.dataset.state = 'failed';
+      return;
+    }
+    var button = form.querySelector('button');
+    button.disabled = true;
+    note.textContent = 'Sending…';
+    note.dataset.state = '';
+    fetch(form.dataset.endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: fields.name, email: fields.email, company: fields.company, message: fields.message, turnstileToken: fields['cf-turnstile-response'] }),
+    })
+      .then(function (reply) { return reply.json().then(function (body) { return { ok: reply.ok, body: body }; }); })
+      .then(function (result) {
+        if (!result.ok) throw new Error(result.body.error || 'Something went wrong.');
+        form.reset();
+        note.textContent = 'Sent. I will reply to your email.';
+        note.dataset.state = 'sent';
+      })
+      .catch(function (error) {
+        note.textContent = error.message === 'Failed to fetch' ? 'Could not reach the server. Check your connection and try again.' : error.message;
+        note.dataset.state = 'failed';
+        if (window.turnstile) window.turnstile.reset();
+      })
+      .finally(function () { button.disabled = false; });
+  });
+})();
+</script>

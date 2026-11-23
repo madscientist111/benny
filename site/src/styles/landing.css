@@ -33,7 +33,7 @@ code { font-family: var(--gh-mono); font-size: 0.86em }
 .btn.ghost:hover { background: rgb(255 255 255 / 0.22) }
 .btn.cf-btn { background: var(--cf); color: var(--ink) }
 .btn svg { width: 1.3em; height: 1.3em }
-.btn.ghost svg { color: var(--cf) }
+.btn.ghost svg.cf-mark { color: var(--cf) }
 
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; padding-block: 22px }
 .nav .mark { font-family: var(--display); font-size: 2rem; line-height: 1 }
@@ -47,7 +47,6 @@ code { font-family: var(--gh-mono); font-size: 0.86em }
 .hero { text-align: center; padding-block: clamp(20px, 4vw, 48px) 0 }
 .oss { display: inline-flex; align-items: center; gap: 8px; background: var(--blue-deep); color: var(--white); padding: 8px 16px; border-radius: 999px; text-decoration: none; font-size: 0.95rem; margin-bottom: clamp(20px, 3vw, 32px) }
 .oss svg { width: 1em; height: 1em; color: var(--yellow) }
-.oss:hover { background: var(--ink) }
 .hero h1 { font-size: clamp(2.3rem, 7.4vw, 6rem); line-height: 1.02 }
 .hero h1 span { display: block }
 .hero h1 img { height: 1.42em; width: auto; vertical-align: middle; margin: -0.24em 0.02em -0.2em; transform: rotate(-4deg); transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) }
@@ -86,6 +85,8 @@ code { font-family: var(--gh-mono); font-size: 0.86em }
 .gh-ev .ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--gh-subtle); border: 2px solid var(--white); color: var(--gh-muted) }
 .gh-ev .ic svg { width: 16px; height: 16px }
 .gh-ev .ic.green { background: var(--gh-green); color: var(--white) }
+.gh-ev .ic.purple { background: #8250df; color: var(--white) }
+.gh-c > img.mate { filter: hue-rotate(150deg) }
 .gh-ev .ic.blue { background: #ddf4ff; color: var(--gh-link) }
 .gh-ev b { color: var(--gh-fg) }
 .gh-ev code { background: #ddf4ff; color: var(--gh-link); border-radius: 6px; padding: 2px 6px; font-size: 12px }
@@ -169,6 +170,32 @@ tr.me th { border-radius: 14px 0 0 14px } tr.me td:last-child { border-radius: 0
   tr.me td::before { color: var(--blue-soft) }
 }
 
+/* for-teams page */
+.setup { border-top: 0 }
+.setup dt { color: var(--blue) }
+.setup-art { width: clamp(120px, 14vw, 180px); margin-top: 8px }
+.mark-tag { font-family: var(--text); font-size: 0.8rem; font-weight: 500; background: var(--yellow); color: var(--ink); padding: 3px 10px; border-radius: 999px; vertical-align: middle; margin-left: 6px; letter-spacing: 0 }
+.nav a.mark { color: inherit }
+.plain-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(20px, 3vw, 36px) clamp(24px, 5vw, 72px) }
+.step-line h3 { font-weight: 500; font-size: clamp(1.2rem, 2vw, 1.45rem); line-height: 1.15; letter-spacing: -0.015em; margin-bottom: 8px; display: flex; gap: 12px; align-items: baseline }
+.step-line h3 i { font-style: normal; flex: none; width: 1.7em; height: 1.7em; border-radius: 50%; background: var(--blue); color: var(--white); display: inline-grid; place-items: center; font-size: 0.8em }
+.step-line p { color: var(--ink-soft); max-width: 44ch }
+.step-line a { color: var(--blue) }
+@media (max-width: 700px) { .plain-steps { grid-template-columns: 1fr } }
+
+/* inquiry form */
+.hire .grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(24px, 5vw, 72px); align-items: start }
+.hire-form { background: var(--white); border-radius: 20px; padding: clamp(18px, 2.6vw, 30px); display: grid; gap: 14px; box-shadow: 0 18px 30px -20px rgb(90 60 0 / 0.3) }
+.hire-form label { display: grid; gap: 6px; font-size: 0.95rem; color: var(--ink-soft) }
+.hire-form input, .hire-form textarea { font: inherit; color: var(--ink); background: var(--cream); border: 1.5px solid var(--cream-line); border-radius: 10px; padding: 11px 12px; width: 100%; resize: vertical }
+.hire-form input:focus-visible, .hire-form textarea:focus-visible { outline: 3px solid var(--blue-soft); border-color: var(--blue) }
+.hire-form button { justify-self: start; border: 0; cursor: pointer; font-family: inherit; background: var(--blue); color: var(--white) }
+.hire-form button:disabled { opacity: 0.6; cursor: wait }
+.hire-note { min-height: 1.5em; font-size: 0.95rem; color: var(--ink-soft) }
+.hire-note[data-state="sent"] { color: var(--gh-green) }
+.hire-note[data-state="failed"] { color: #b3261e }
+@media (max-width: 860px) { .hire .grid { grid-template-columns: 1fr } }
+
 .end { padding-block: 0 clamp(16px, 2vw, 28px) }
 .panel { background: var(--blue); color: var(--white); border-radius: clamp(20px, 3vw, 36px); overflow: hidden; padding: clamp(28px, 5vw, 64px) clamp(20px, 5vw, 64px) 0 }
 .ask { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 24px; align-items: center }
@@ -180,8 +207,12 @@ tr.me th { border-radius: 14px 0 0 14px } tr.me td:last-child { border-radius: 0
 .cols ul { list-style: none; padding: 0; display: grid; gap: 8px }
 .cols a { text-decoration: none } .cols a:hover { text-decoration: underline; text-underline-offset: 4px }
 .cols p { color: var(--blue-soft); max-width: 28ch }
-.giant { font-family: var(--display); font-size: clamp(4rem, 22vw, 18.5rem); line-height: 0.74; color: var(--blue-tint); text-align: center; margin: clamp(20px, 4vw, 48px) 0 -0.09em; user-select: none; white-space: nowrap }
+.cols .teams-link { margin-top: 14px }
+.cols .teams-link a { display: inline-block; white-space: nowrap; font-size: 0.92rem; background: var(--yellow); color: var(--ink); padding: 8px 14px; border-radius: 999px; text-decoration: none }
+.cols .teams-link a:hover { background: var(--white); text-decoration: none }
+.giant { pointer-events: none; font-family: var(--display); font-size: clamp(4rem, 22vw, 18.5rem); line-height: 0.74; color: var(--blue-tint); text-align: center; margin: clamp(20px, 4vw, 48px) 0 -0.09em; user-select: none; white-space: nowrap }
 .legal { display: flex; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; color: var(--ink-soft); font-size: 0.9rem; padding-block: 16px 8px }
+.legal a { color: inherit; text-underline-offset: 3px } .legal a:hover { color: var(--blue) }
 @media (max-width: 760px) {
   .ask { grid-template-columns: 1fr; text-align: center; justify-items: center }
   .ask img { order: -1; width: 150px }

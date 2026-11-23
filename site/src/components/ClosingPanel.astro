@@ -1,0 +1,35 @@
+---
+// The blue panel that ends every page: a closing line with Benny, the link columns and the big
+// wordmark. Each page gives its own closing line; the links are the same everywhere.
+interface Props {
+	heading: string;
+	text: string;
+	forTeam?: boolean;
+}
+
+const { heading, text, forTeam = false } = Astro.props;
+const repo = "https://github.com/madscientist111/benny";
+---
+
+<footer class="end"><div class="in">
+  <div class="panel">
+    <div class="ask">
+      <div>
+        <h2 class="display">{heading}</h2>
+        <p>{text}</p>
+        {forTeam
+          ? <div class="cta"><a class="btn" href="#ask">Let's talk</a><a class="btn ghost" href={repo}><svg><use href="#i-gh"/></svg>Read the repo on GitHub</a></div>
+          : <div class="cta"><a class="btn" href={repo}><svg><use href="#i-gh"/></svg>Read the repo on GitHub</a><a class="btn ghost" href="/#cloudflare"><svg class="cf-mark"><use href="#i-cf"/></svg>Host it on Cloudflare</a></div>}
+      </div>
+      <img class="sticker" src="/art/handoff.webp" alt="Benny holding out a pull request">
+    </div>
+    <div class="cols">
+      <div><h3>Benny</h3><p>The AI engineer that lives in your GitHub issues.</p>{!forTeam && <p class="teams-link"><a href="/for-teams">Want this for your team? <span aria-hidden="true">→</span></a></p>}</div>
+      <div><h3>Project</h3><ul><li><a href={repo}>GitHub repo</a></li><li><a href={repo + "#readme"}>README</a></li><li><a href={repo + "/blob/main/LICENSE"}>MIT licence</a></li></ul></div>
+      <div><h3>Learn</h3><ul><li><a href="/#how">How it works</a></li><li><a href="/#cloudflare">Made for Cloudflare</a></li><li><a href="/#compare">How it compares</a></li></ul></div>
+      <div><h3>Background</h3><ul><li><a href={repo + "#why-i-built-it"}>Why I built it</a></li><li><a href={repo + "#why-github"}>Why GitHub</a></li><li><a href={repo + "#limitations"}>Limitations</a></li></ul></div>
+    </div>
+    <div class="giant" aria-hidden="true">Benny</div>
+  </div>
+  <div class="legal"><span>Built in public at <a href="https://heyshoo.in">heyshoo.in</a></span><span>Not affiliated with GitHub or Cloudflare</span></div>
+</div></footer>
