@@ -23,7 +23,7 @@ export { DirectoryBackupGateway } from '@cloudflare/sandbox'
 
 const app = new Hono()
 
-app.get('/', (c) => c.text('Hello Cloudflare Workers!'))
+app.get('/', (c) => c.text('Benny'))
 
 // The cron list and its API, behind Cloudflare Access (`src/cron-list.ts`).
 app.route('/', cronList)
@@ -72,13 +72,5 @@ app.post('/mcp', async (c: Context) => {
 })
 // No server-sent events: the client then sends every request as a POST.
 app.get('/mcp', (c: Context) => c.body(null, 405))
-
-app.get('/user/:id', async (c: Context) => {
-	console.log('user ma aavyu')
-	const id = c.req.queries()
-	console.log('id', id)
-
-})
-
 
 export default app

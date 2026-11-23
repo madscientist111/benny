@@ -46,8 +46,7 @@ or agent.
 - **Logs are one JSON object per line:** `log('label', { ...fields })` from `src/log.ts`, never
   `console.log`. A line about a request carries `requestId` (the GitHub comment id); a line about
   a run carries `runId` (the `requestId` that started it), so one id finds a request's whole story;
-  a line about a push carries `deliveryId`, because a push has no request. The one exception is the
-  owner's debug route in `src/index.ts`.
+  a line about a push carries `deliveryId`, because a push has no request.
 - **PR descriptions and explanations** for people follow `.claude/skills/writing-explanations/SKILL.md`.
 - **Effort is counted in tasks, never in days or hours** (full steps and report format:
   `.claude/skills/effort-plan/SKILL.md`). Read the docs of what the work touches first, then split it into tasks

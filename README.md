@@ -2,7 +2,9 @@
 
 ![Benny, a beaver in a hard hat holding an issue card](assets/benny-banner.png)
 
-A coding agent that lives in my GitHub issues. I mention it, it researches, writes the requirements with me, works on its own branch and opens a PR. It runs on Cloudflare Workers, so my laptop can be off.
+**A persistent, self-hosted AI software engineer made for GitHub.** An open-source alternative to Devin, Capy and Factory's Droids.
+
+Benny lives in my GitHub issues. I mention it, it researches, writes the requirements with me, works on its own branch and opens a PR. I run it myself: on my laptop, or on my own Cloudflare account so the laptop can be off.
 
 > [!CAUTION]
 > **This is an experiment.** Benny runs my own work on my own Cloudflare account. I share it as a reference for building an agent harness on Workers and Durable Objects. Read it, copy what you like, fork it.
@@ -37,6 +39,21 @@ The second win was putting everything in one place. GitHub is my Linear, my Noti
 
 Then I made Claude Code the harness in production, and kept pi for dev. Both sit behind one contract, so the rest of Benny does not know which one runs.
 
+## Why GitHub
+
+I started with GitHub because an engineering agent does not need another web app.
+
+- **The primitives already exist.** Issues take the tasks, pull requests handle review, projects cover planning, wikis hold the docs, and labels track state.
+- **Engineers already live there.** There is no new dashboard to check and no new tool to learn.
+- **The context is already there.** The backlog, the discussions and the review history sit next to the code.
+- **It costs nothing extra.** All of it comes with a GitHub account.
+
+## Always on
+
+Every issue gets its own agent, and that agent keeps its context and its work branch between messages. Once mentioned, Benny follows the thread and decides for itself whether a new comment needs a reply, a reaction or silence. It also runs recurring jobs on a schedule.
+
+Always on does not mean always running. An agent sleeps between messages and costs nothing while it waits; a comment or a due schedule wakes it.
+
 ## A normal day
 
 I mention `@bobby-sb` on a few issues and ask it to research things. The threads run at the same time. On the one I care about, we write the requirements together until I'm happy. I say start. It works on its own branch and opens a PR. I ask it to test its own work, get the PR reviewed, and fix what the review found.
@@ -46,6 +63,17 @@ Some work repeats, so a mention can also set a schedule: `@bobby-sb every weekda
 Benny puts `[INPUT_REQUIRED]` on the issue title and adds an `input-required` label when a reply ends on a question for me, when a run pauses at its time limit, or when a PR is ready for review. One search shows every thread that waits for me, and my next comment clears the mark.
 
 It is the same loop I run with Claude Code on my laptop, with three differences: the laptop can be off, it runs on my own infrastructure, and I never think about which worktree or branch it is on. Nothing in it would break if three people used it.
+
+## How it compares
+
+Devin, Capy and Factory's Droids are the products people know in this space. Benny is one person's project, not a match for them feature by feature. What differs is where it lives and who runs it:
+
+| | Where you talk to it | Who runs it |
+| --- | --- | --- |
+| **Benny** | GitHub issues and pull requests | You: your machine or your Cloudflare account. Open source. |
+| Devin | Slack, PR comments, its own app | Cognition, hosted |
+| Capy | Its own app, which opens PRs on GitHub | Capy, hosted |
+| Factory's Droids | Terminal, IDE, browser, Slack | Factory, hosted |
 
 ## How it is built
 
@@ -103,17 +131,34 @@ When you're the only user and you know what the agent will do, running it on you
 
 </details>
 
-<details><summary>Running your own</summary>
+## Self-hosting
 
-You need a Cloudflare account with Workers, Durable Objects, Containers and R2, a GitHub App, an OpenRouter key for the decision model, an Exa key, and a Claude Code token for production or an OpenCode Go key for the pi harness. These are the steps I follow; your account will differ in places.
+There is no hosted Benny and no seat to buy. You run it yourself, in one of two ways.
 
-1. Create a GitHub App with issues, pull requests and contents permissions, and point its webhook at your Worker. Don't give it the `workflows` permission.
-2. Copy `.dev.vars.example` to `.dev.vars` and fill it in. Set the same values in production with `cf secret put <NAME>`.
+Both need a GitHub App, an OpenRouter key for the decision model, an Exa key, and a Claude Code token or an OpenCode Go key for the model's work. These are the steps I follow; your account will differ in places.
+
+### On your own machine
+
+This is how I run it day to day.
+
+1. Create a GitHub App with issues, pull requests and contents permissions. Don't give it the `workflows` permission.
+2. Copy `.dev.vars.example` to `.dev.vars` and fill it in.
 3. Change the App slugs and bot ids at the top of `cloudflare.config.ts`, and `BENNY_GIT_IDENTITY` in `src/repo-do.ts`, to your App's.
-4. Copy `.env.example` to `.env` and set `PUBLIC_BASE_URL_PRODUCTION` to your Worker's URL: Claude Code's containers call its `/mcp`.
-5. `pnpm install`, then `pnpm codemode-sandbox:deploy`, then `pnpm agent:deploy:production --secrets-file <file with CLAUDE_CODE_OAUTH_TOKEN>`, then `pnpm deploy`.
+4. `pnpm install`, then `pnpm dev`. The dev server listens on port 8787.
+5. Open a tunnel to that port, list its host in `DEV_ALLOWED_HOSTS` in `.env`, and point the App's webhook at it. GitHub has to reach your machine to deliver comments.
 
-</details>
+### On your Cloudflare account
+
+You need Workers, Durable Objects, Containers and R2. Then the laptop can be off.
+
+1. Do steps 1 to 3 above, and point the App's webhook at your Worker.
+2. Set the values from `.dev.vars` in production with `cf secret put <NAME>`.
+3. Copy `.env.example` to `.env` and set `PUBLIC_BASE_URL_PRODUCTION` to your Worker's URL: Claude Code's containers call its `/mcp`.
+4. `pnpm install`, then `pnpm codemode-sandbox:deploy`, then `pnpm agent:deploy:production --secrets-file <file with CLAUDE_CODE_OAUTH_TOKEN>`, then `pnpm deploy`.
+
+## What's next
+
+GitHub is the focus for now, and I want that workflow solid first. Slack comes next, then other integrations, and eventually Benny's own interface.
 
 ## Licence
 
