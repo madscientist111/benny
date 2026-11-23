@@ -9,7 +9,7 @@ export type LogIds = { requestId?: string; runId?: string; deliveryId?: string }
 
 // Fields that hold private text: `args` holds tool arguments (file content, comment bodies) and
 // `state` the thread's comments for the decision model. Production logs leave Cloudflare
-// (`logpush`), so these are written only where `.dev.vars` sets `ENVIRONMENT=development`.
+// (`logpush`), so these are written only where `.env` sets `ENVIRONMENT=development`.
 const PRIVATE_FIELDS = ['args', 'state']
 
 /**

@@ -4,7 +4,6 @@ dist/
 .wrangler/
 .dev.vars*
 .dev copy.vars
-!.dev.vars.example
 .env*
 !.env.example
 *.log

@@ -142,7 +142,7 @@ Both need a GitHub App, an OpenRouter key for the decision model, an Exa key, an
 This is how I run it day to day.
 
 1. Create a GitHub App with issues, pull requests and contents permissions. Don't give it the `workflows` permission.
-2. Copy `.dev.vars.example` to `.dev.vars` and fill it in.
+2. Copy `.env.example` to `.env` and fill it in.
 3. Change the App slugs and bot ids at the top of `cloudflare.config.ts`, and `BENNY_GIT_IDENTITY` in `src/repo-do.ts`, to your App's.
 4. `pnpm install`, then `pnpm dev`. The dev server listens on port 8787.
 5. Open a tunnel to that port, list its host in `DEV_ALLOWED_HOSTS` in `.env`, and point the App's webhook at it. GitHub has to reach your machine to deliver comments.
@@ -152,8 +152,8 @@ This is how I run it day to day.
 You need Workers, Durable Objects, Containers and R2. Then the laptop can be off.
 
 1. Do steps 1 to 3 above, and point the App's webhook at your Worker.
-2. Set the values from `.dev.vars` in production with `cf secret put <NAME>`.
-3. Copy `.env.example` to `.env` and set `PUBLIC_BASE_URL_PRODUCTION` to your Worker's URL: Claude Code's containers call its `/mcp`.
+2. Set the secrets from `.env` in production with `cf secret put <NAME>`.
+3. In `.env`, set `PUBLIC_BASE_URL_PRODUCTION` to your Worker's URL: Claude Code's containers call its `/mcp`.
 4. `pnpm install`, then `pnpm codemode-sandbox:deploy`, then `pnpm agent:deploy:production --secrets-file <file with CLAUDE_CODE_OAUTH_TOKEN>`, then `pnpm deploy`.
 
 ## What's next

@@ -58,7 +58,7 @@ export default defineConfig(({ mode }) => {
 			// Lets the account's Logpush jobs (Axiom today, R2 later) ship this Worker's logs; the jobs are set up outside this file.
 			logpush: true,
 			env: {
-				// `development` in `.dev.vars` lets logs carry private text (src/log.ts); anything else keeps it out.
+				// `development` in `.env` lets logs carry private text (src/log.ts); anything else keeps it out.
 				ENVIRONMENT: bindings.text('production'),
 				// `mode` is "production" only when `pnpm deploy` passes `--mode production`.
 				BOT_USERNAME: bindings.text(mode === "production" ? PRODUCTION_APP.slug : LOCAL_APP.slug),
