@@ -11,3 +11,10 @@ GITHUB_PRIVATE_KEY=
 # The model provider (OpenCode Go) and the web search provider (Exa).
 OPENCODE_API_KEY=
 EXA_API_KEY=
+
+# The decision model, Jev through OpenRouter (src/jev/classify.ts).
+OPENROUTER_KEY=
+
+# The cron list at /crons: the Cloudflare Access team domain and the app's audience tag. Without both it answers 401.
+ACCESS_TEAM_DOMAIN=
+ACCESS_AUD=

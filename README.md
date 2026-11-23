@@ -35,9 +35,15 @@ The first win came fast: a review agent on the spare OpenCode Go usage I was alr
 
 The second win was putting everything in one place. GitHub is my Linear, my Notion and my code host. Benny creates and updates its own issues and tracks its progress there, in a UI I already live in.
 
+The third step was Claude Code as the harness. In production each thread now runs Claude Code in its own container, and Claude Code reaches Benny's tools (GitHub, the work branch, web search) over MCP. The pi harness stays: it runs in dev, and it can hand a single task to Claude Code through a `claude_code` tool.
+
 ## A normal day
 
 I mention `@bobby-sb` on a few issues and ask it to research things. The threads run at the same time. On the one I care about, we write the requirements together until I'm happy. I say start. It works on its own branch and opens a PR. I ask it to test its own work, get the PR reviewed, and fix what the review found.
+
+Some work repeats, so a mention can also set a schedule: `@bobby-sb every weekday at 9am IST, post a digest of what merged and what is stuck`. Benny confirms the schedule and the next time in words, then posts in that issue each time it comes due. Closing the issue pauses it.
+
+When a reply ends on a question for me, Benny puts `[INPUT_REQUIRED]` on the issue title and an `input-required` label, so one search shows every thread that waits for me. My next comment clears it.
 
 It is the same loop I run with Claude Code on my laptop, with three differences: the laptop can be off, it runs on my own infrastructure, and I never think about which worktree or branch it is on. Nothing in it would break if three people used it.
 
@@ -48,6 +54,8 @@ flowchart LR
   gh[GitHub issue or PR] -->|webhook| worker[Worker]
   worker -->|no mention: ignore, react or reply?| jev[Decision model]
   worker -->|mention| agent[PiAgent: one Durable Object per thread]
+  agent -->|tasks| claude[Claude Code container]
+  claude -->|tools over MCP| agent
   agent -->|reads| repo[RepoDO: default branch]
   agent -->|edits| branch[BranchDO: work branch]
   agent -->|tests, typecheck, servers| sandbox[Sandbox container]
@@ -55,16 +63,20 @@ flowchart LR
   agent -->|reply with a usage footnote| gh
 ```
 
-- **One agent per thread.** Each issue or PR gets its own `PiAgent` Durable Object. It sleeps between messages and costs nothing while it waits. A person starts every run with a mention; there is no schedule.
+- **One agent per thread.** Each issue or PR gets its own `PiAgent` Durable Object. It sleeps between messages and costs nothing while it waits. A person starts every run with a mention, or sets a schedule with one.
 - **Files live in Durable Objects.** `RepoDO` holds the default branch, `BranchDO` the work branch. Commits go through the GitHub API: no clone, no git process.
 - **A sandbox only when needed.** Reading and editing code needs no container. For tests, typechecks and servers I added Cloudflare Sandbox containers, with the pnpm store cached in R2 by lockfile hash.
-- **A decision model for follow-ups.** After the first mention, every comment in the thread without a mention is classified as ignore, react or reply by a small model on Workers AI (`clef-flash`), so Benny doesn't answer every "thanks".
-- **Models and search.** OpenCode Go, default `deepseek-v4.1-flash`. Web search through Exa. A public repo linked in the thread can be read, in its own Durable Object.
+- **Two harnesses behind one contract.** In production the model's work is Claude Code (`claude-sonnet-5-5`), in a container of a second Worker, one container per thread. It has no GitHub token: it calls Benny's tools over MCP with a token that lasts for one run, and the same write gate applies. In dev the harness is pi-durable on OpenCode Go (default `deepseek-v4.1-flash`).
+- **A decision model for follow-ups.** After the first mention, every comment in the thread without a mention is classified as ignore, react or reply, so Benny doesn't answer every "thanks". The model answers typed questions with probabilities and plain code decides (`src/jev/decide.ts`). I started on Workers AI (`clef-flash`) and moved to TypeSafe's Jev 1.13 through OpenRouter, because it reads short, vague messages better: 43–44 of 44 test messages against 35. The same model says whether a posted reply waits for me.
+- **Schedules.** A cron is a schedule, a timezone and a prompt kept for one issue. The thread's Durable Object wakes itself at the next time. A page at `/crons`, behind Cloudflare Access, lists them all.
+- **Search and other repos.** Web search through Exa. A public repo linked in the thread can be read, in its own Durable Object.
+- **Checks.** `pnpm test` runs the rules that are plain code. The decision model has a recorded eval, and CI fails when its questions change without a new run.
 
 ## What it may and may not do
 
 - **Writes need a member.** A GitHub write or branch tool runs only when every pending request of the run is a mention from a repo member with write access. The check reads GitHub permissions on every request.
 - **It opens PRs, and that's it.** There is no tool to merge, approve or close a PR. It pushes only to `bobby/...` branches and never changes `.github/workflows`.
+- **Schedules are writes.** Setting or removing a cron needs the same mention from a member, and a cron's own firing can never join a person's run.
 - **Sandbox network:** GET and HEAD to the npm registry only, with credentials stripped.
 - **Secrets:** the tools hide `.env`, `.dev.vars`, keys and the like from the model.
 - **Not covered:** text from outsiders (comments, fetched web pages) can still steer a run that a member started. I run it only on repos where I know who comments.
@@ -93,12 +105,13 @@ When you're the only user and you know what the agent will do, running it on you
 
 <details><summary>Running your own</summary>
 
-You need a Cloudflare account with Workers, Durable Objects, Containers, R2 and Workers AI, a GitHub App, an OpenCode Go key and an Exa key. These are the steps I follow; your account will differ in places.
+You need a Cloudflare account with Workers, Durable Objects, Containers and R2, a GitHub App, an OpenRouter key for the decision model, an Exa key, and a Claude Code token for production or an OpenCode Go key for the pi harness. These are the steps I follow; your account will differ in places.
 
 1. Create a GitHub App with issues, pull requests and contents permissions, and point its webhook at your Worker. Don't give it the `workflows` permission.
 2. Copy `.dev.vars.example` to `.dev.vars` and fill it in. Set the same values in production with `cf secret put <NAME>`.
-3. Change `BOT_USERNAME` and the bot's id in `src/bot.ts`, and `BENNY_GIT_IDENTITY` in `src/repo-do.ts`, to your App's.
-4. `pnpm install`, then `pnpm codemode-sandbox:deploy`, then `pnpm deploy`.
+3. Change the App slugs and bot ids at the top of `cloudflare.config.ts`, and `BENNY_GIT_IDENTITY` in `src/repo-do.ts`, to your App's.
+4. Copy `.env.example` to `.env` and set `PUBLIC_BASE_URL_PRODUCTION` to your Worker's URL: Claude Code's containers call its `/mcp`.
+5. `pnpm install`, then `pnpm codemode-sandbox:deploy`, then `pnpm agent:deploy:production --secrets-file <file with CLAUDE_CODE_OAUTH_TOKEN>`, then `pnpm deploy`.
 
 </details>
 
