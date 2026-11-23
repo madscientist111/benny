@@ -2,7 +2,7 @@
 
 ![Benny, a beaver in a hard hat holding an issue card](assets/benny-banner.png)
 
-**A persistent, self-hosted AI software engineer made for GitHub.** An open-source alternative to Devin, Capy and Factory's Droids.
+**A persistent, self-hosted AI software engineer made for GitHub.** An open-source alternative to Devin, Capy and Factory's Droids. It works with the AI subscriptions you already pay for, like Claude Code and OpenCode Go.
 
 Benny lives in my GitHub issues. I mention it, it researches, writes the requirements with me, works on its own branch and opens a PR. I run it myself: on my laptop, or on my own Cloudflare account so the laptop can be off.
 
@@ -133,7 +133,7 @@ When you're the only user and you know what the agent will do, running it on you
 
 ## Self-hosting
 
-There is no hosted Benny and no seat to buy. You run it yourself, in one of two ways.
+There is no hosted Benny and no seat to buy. You run it yourself, in one of two ways. The model's work runs on your own subscription: a Claude Code token, or an OpenCode Go key.
 
 Both need a GitHub App, an OpenRouter key for the decision model, an Exa key, and a Claude Code token or an OpenCode Go key for the model's work. These are the steps I follow; your account will differ in places.
 
