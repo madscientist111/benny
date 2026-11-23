@@ -1,0 +1,176 @@
+---
+// The Benny landing page at benny.heyshoo.in: hero with an example issue thread, three facts,
+// one request in four steps, Cloudflare, limits, comparison, and the closing panel with the footer.
+// The threads are examples drawn in GitHub's look, not screenshots; the art in `public/art` was
+// generated with codex from the Benny mascot.
+import Page from "../layouts/Page.astro";
+import "../styles/landing.css";
+
+const repo = "https://github.com/madscientist111/benny";
+---
+
+<Page
+	title="Benny: the AI engineer that lives in your GitHub issues"
+	description="Benny is an open-source AI software engineer for GitHub. Mention it in an issue: it researches, writes the requirements with you, works on its own branch and opens a PR. You run it on your own Cloudflare account."
+>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-star" viewBox="0 0 20 20"><path fill="currentColor" d="M10 1.6l2.5 5.3 5.8.7-4.3 4 1.1 5.8L10 14.5l-5.1 2.9 1.1-5.8-4.3-4 5.8-.7z"/></symbol>
+  <symbol id="i-gh" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></symbol>
+  <symbol id="i-cf" viewBox="0 0 24 24"><path fill="currentColor" d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M4 10.5l4 4 8-9"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 20 20"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M5 5l10 10M15 5L5 15"/></symbol>
+  <symbol id="i-open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="4.5" cy="3.5" r="1.7"/><circle cx="4.5" cy="12.5" r="1.7"/><circle cx="11.5" cy="5" r="1.7"/><path d="M4.5 5.2v5.6M11.5 6.7c0 2.4-2.6 2.6-4.6 2.9-1.3.2-2.4.7-2.4 1.6"/></g></symbol>
+  <symbol id="i-pr" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="3.5" r="1.7"/><circle cx="4" cy="12.5" r="1.7"/><circle cx="12" cy="12.5" r="1.7"/><path d="M4 5.2v5.6M12 10.8V6.5c0-1.4-.9-2.5-2.5-2.5H8M9.6 2.2L7.8 4l1.8 1.8"/></g></symbol>
+</svg>
+
+<div class="band-blue"><div class="in">
+  <div class="nav">
+    <span class="mark">Benny</span>
+    <ul><li><a href="#how">How it works</a></li><li><a href="#cloudflare">Cloudflare</a></li><li><a href="#compare">Compare</a></li></ul>
+    <a class="gh" href={repo}><svg><use href="#i-gh"/></svg>Star on GitHub</a>
+  </div>
+  <div class="hero">
+    <a class="oss" href={repo + "/blob/main/LICENSE"}><svg><use href="#i-star"/></svg>Open source under the MIT licence</a>
+    <h1 class="display"><span>The AI engineer</span> <span>that lives <img class="sticker" src="/art/stand.webp" alt="Benny the beaver, waving"> in your</span> <span>GitHub issues</span></h1>
+    <p class="lede">Mention Benny in an issue. It researches, writes the requirements with you, works on its own branch and opens a PR.</p>
+    <div class="cta">
+      <a class="btn" href={repo}><svg><use href="#i-gh"/></svg>Read the repo on GitHub</a>
+      <a class="btn ghost" href="#cloudflare"><svg><use href="#i-cf"/></svg>Host it on Cloudflare</a>
+    </div>
+    <div class="ghub">
+      <div class="gh-top"><svg><use href="#i-gh"/></svg><span>madscientist111 / <b>benny</b></span><span>Issues</span><span class="ex">Example thread</span></div>
+      <div class="gh-title"><h3>Dependency cache misses on every cold start <i>#53</i></h3><span class="gh-state"><svg><use href="#i-open"/></svg>Open</span></div>
+      <div class="gh-body">
+        <div class="gh-c"><img src="/art/you.webp" alt=""><div class="gh-box"><header><b>you</b> commented 12 minutes ago</header><div class="txt"><span class="gh-at">@bobby-sb</span> The dependency cache misses on every cold start, even when the lockfile is unchanged. Find out why and write the fix up as requirements on this issue.</div></div></div>
+        <div class="gh-c"><img class="bot" src="/art/pfp.jpg" alt=""><div class="gh-box"><header><b>bobby-sb</b><span class="gh-bot">bot</span> commented 8 minutes ago</header><div class="txt">I read the cache step and the last five cold starts. The cache key includes the build time, so it never matches. Proposed requirements:<ol><li>Key the cache on the lockfile hash only.</li><li>Add a test that a second start is a cache hit.</li></ol>One question: should the key include the Node version?</div></div></div>
+        <div class="gh-c"><img src="/art/you.webp" alt=""><div class="gh-box"><header><b>you</b> commented 5 minutes ago</header><div class="txt">Sure, include it. Go ahead.</div></div></div>
+        <div class="gh-ev"><span class="ic blue"><svg><use href="#i-branch"/></svg></span><span><b>bobby-sb</b> created branch <code>bobby/issue-53</code></span></div>
+        <div class="gh-ev"><span class="ic green"><svg><use href="#i-pr"/></svg></span><span><b>bobby-sb</b> opened pull request <b>Key the dependency cache on the lockfile</b> #54</span></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<section class="facts-sec"><div class="in">
+  <div class="facts" id="facts">
+    <div><div class="swap" tabindex="0"><img class="sticker one" src="/art/cloud.webp" alt="Benny working on a cloud"><img class="sticker two" src="/art/cloudwave.webp" alt="" aria-hidden="true"></div><h3>It works with your laptop closed</h3><p>Benny runs remotely, on your own Cloudflare account. Nothing runs on your laptop, so you can shut it and the work continues.</p></div>
+    <div><div class="swap" tabindex="0"><img class="sticker one" src="/art/sleep.webp" alt="Benny asleep; he wakes when you point at him"><img class="sticker two" src="/art/awake.webp" alt="" aria-hidden="true"></div><span class="hint" aria-hidden="true"><span class="hov">psst, hover to wake him</span><span class="tap">psst, tap to wake him</span></span><h3>Always on, not always running</h3><p>Every issue gets its own agent that keeps its context and its branch. It sleeps between comments, costs nothing while it waits, and wakes when you comment.</p></div>
+    <div><div class="swap" tabindex="0"><img class="sticker one" src="/art/handoff.webp" alt="Benny holding out a pull request"><img class="sticker two" src="/art/thumbs.webp" alt="" aria-hidden="true"></div><h3>It opens PRs. You merge.</h3><p>Benny has no way to merge, approve or close a pull request. A person stays in charge.</p></div>
+  </div>
+</div></section>
+
+<section id="how"><div class="in steps">
+  <h2 class="sec-title">One request, start to finish</h2>
+  <div class="step">
+    <div><h3><i>1</i>You mention Benny</h3><p>Write the problem in an issue, the way you would for a teammate. There is no other app to open.</p></div>
+    <div class="ghub"><div class="gh-top"><svg><use href="#i-gh"/></svg><span>madscientist111 / <b>benny</b></span><span>Issue #53</span></div><div class="gh-body">
+      <div class="gh-c"><img src="/art/you.webp" alt=""><div class="gh-box"><header><b>you</b> commented</header><div class="txt"><span class="gh-at">@bobby-sb</span> The dependency cache misses on every cold start. Find out why and write the fix up as requirements.</div></div></div>
+    </div></div>
+  </div>
+  <div class="step">
+    <div><h3><i>2</i>You agree the requirements</h3><p>Benny says what it read, what it found and what it proposes. When it needs an answer it labels the issue, so one search shows every thread that waits for you.</p></div>
+    <div class="ghub"><div class="gh-top"><svg><use href="#i-gh"/></svg><span><b>[INPUT_REQUIRED]</b> Dependency cache misses…</span><span class="gh-label">input-required</span></div><div class="gh-body">
+      <div class="gh-c"><img class="bot" src="/art/pfp.jpg" alt=""><div class="gh-box"><header><b>bobby-sb</b><span class="gh-bot">bot</span> commented</header><div class="txt">One question: should the key include the Node version?</div></div></div>
+    </div></div>
+  </div>
+  <div class="step">
+    <div><h3><i>3</i>You say go</h3><p>No second mention needed: Benny follows the thread and knows when a comment is meant for it. It works on its own branch and opens a pull request that links the issue.</p></div>
+    <div class="ghub"><div class="gh-top"><svg><use href="#i-gh"/></svg><span>madscientist111 / <b>benny</b></span><span>Issue #53</span></div><div class="gh-body">
+      <div class="gh-c"><img src="/art/you.webp" alt=""><div class="gh-box"><header><b>you</b> commented</header><div class="txt">Sure, include it. Go ahead.</div></div></div>
+      <div class="gh-ev"><span class="ic blue"><svg><use href="#i-branch"/></svg></span><span><b>bobby-sb</b> created branch <code>bobby/issue-53</code></span></div>
+      <div class="gh-ev"><span class="ic green"><svg><use href="#i-pr"/></svg></span><span><b>bobby-sb</b> opened pull request #54</span></div>
+    </div></div>
+  </div>
+  <div class="step">
+    <div><h3><i>4</i>You review and merge</h3><p>Ask it to run the tests, get the PR reviewed and fix what the review finds. Merging stays with you.</p></div>
+    <div class="ghub"><div class="gh-top"><svg><use href="#i-gh"/></svg><span>madscientist111 / <b>benny</b></span><span>Pull request #54</span></div><div class="gh-body">
+      <div class="gh-c"><img src="/art/you.webp" alt=""><div class="gh-box"><header><b>you</b> commented</header><div class="txt">Run the tests in the sandbox, then review the PR and fix what the review finds.</div></div></div>
+      <div class="gh-ev"><span class="ic green"><svg><use href="#i-check"/></svg></span><span><span class="ok">Tests passed</span> · review found one issue · fixed</span></div>
+      <div class="gh-c"><img class="bot" src="/art/pfp.jpg" alt=""><div class="gh-box"><header><b>bobby-sb</b><span class="gh-bot">bot</span> commented</header><div class="txt">The PR is ready for you.</div></div></div>
+    </div></div>
+  </div>
+</div></section>
+
+<section class="cf" id="cloudflare"><div class="in grid">
+  <div class="side">
+    <svg class="logo" role="img" aria-label="Cloudflare"><use href="#i-cf"/></svg>
+    <h2 class="sec-title">Made for Cloudflare</h2>
+    <p>Benny is built on Cloudflare's own pieces and runs on your account. That is why it can wait on a hundred issues and cost nothing until someone comments.</p>
+    <a class="btn cf-btn" href={repo + "#on-your-cloudflare-account"}><svg><use href="#i-cf"/></svg>Host it on Cloudflare</a>
+  </div>
+  <div>
+    <dl>
+      <div><dt>Workers</dt><dd>Receive every GitHub comment and decide whether Benny should reply, react or stay quiet.</dd></div>
+      <div><dt>Durable Objects</dt><dd>One agent per issue. Each keeps its context and its branch, and sleeps for free between comments.</dd></div>
+      <div><dt>Containers</dt><dd>Run Claude Code and your tests, one container per thread.</dd></div>
+      <div><dt>R2</dt><dd>Caches installed packages by lockfile, so the next run starts fast.</dd></div>
+    </dl>
+    <p class="local">Want to try it first? It also runs on your own machine with <code>pnpm dev</code> and a tunnel.</p>
+  </div>
+</div></section>
+
+<section class="rules-sec"><div class="in grid">
+  <div><h2 class="sec-title">What it may and may not do</h2><p class="sec-lede">The limits are part of the code, not a promise in a prompt.</p></div>
+  <div class="rules">
+    <div class="yes"><h3>It will</h3><ul>
+      <li><svg><use href="#i-check"/></svg>Write only when a repo member with write access asks.</li>
+      <li><svg><use href="#i-check"/></svg>Push only to its own <code>bobby/...</code> branches.</li>
+      <li><svg><use href="#i-check"/></svg>Stop a run after 30 minutes and say so.</li>
+    </ul></div>
+    <div class="no"><h3>It won't</h3><ul>
+      <li><svg><use href="#i-cross"/></svg>Merge, approve or close a pull request.</li>
+      <li><svg><use href="#i-cross"/></svg>Change your GitHub workflows.</li>
+      <li><svg><use href="#i-cross"/></svg>Show the model your <code>.env</code> files or keys.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<section class="in compare" id="compare">
+  <h2 class="sec-title">How it compares</h2>
+  <p class="sec-lede">Devin, Capy and Factory's Droids are the products people know. Benny is one person's project and does not match them feature by feature. What differs is where it lives and who runs it.</p>
+  <table>
+    <thead><tr><th></th><th>Where you talk to it</th><th>Who runs it</th></tr></thead>
+    <tbody>
+      <tr class="me"><th>Benny</th><td data-label="Where">GitHub issues and pull requests</td><td data-label="Who runs it">You, on your Cloudflare account or your own machine. Open source.</td></tr>
+      <tr><th>Devin</th><td data-label="Where">Slack, PR comments, its own app</td><td data-label="Who runs it">Cognition, hosted</td></tr>
+      <tr><th>Capy</th><td data-label="Where">Its own app, which opens PRs on GitHub</td><td data-label="Who runs it">Capy, hosted</td></tr>
+      <tr><th>Factory's Droids</th><td data-label="Where">Terminal, IDE, browser, Slack</td><td data-label="Who runs it">Factory, hosted</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer class="end"><div class="in">
+  <div class="panel">
+    <div class="ask">
+      <div>
+        <h2 class="display">You scrolled all this way. Go read the code.</h2>
+        <p>Benny is an experiment that runs my own work. There is no hosted version and no seat to buy: read it, copy what you like, fork it.</p>
+        <div class="cta"><a class="btn" href={repo}><svg><use href="#i-gh"/></svg>Read the repo on GitHub</a><a class="btn ghost" href="#cloudflare"><svg><use href="#i-cf"/></svg>Host it on Cloudflare</a></div>
+      </div>
+      <img class="sticker" src="/art/handoff.webp" alt="Benny holding out a pull request">
+    </div>
+    <div class="cols">
+      <div><h3>Benny</h3><p>The AI engineer that lives in your GitHub issues.</p></div>
+      <div><h3>Project</h3><ul><li><a href={repo}>GitHub repo</a></li><li><a href={repo + "#readme"}>README</a></li><li><a href={repo + "/blob/main/LICENSE"}>MIT licence</a></li></ul></div>
+      <div><h3>Learn</h3><ul><li><a href="#how">How it works</a></li><li><a href="#cloudflare">Made for Cloudflare</a></li><li><a href="#compare">How it compares</a></li></ul></div>
+      <div><h3>Background</h3><ul><li><a href={repo + "#why-i-built-it"}>Why I built it</a></li><li><a href={repo + "#why-github"}>Why GitHub</a></li><li><a href={repo + "#limitations"}>Limitations</a></li></ul></div>
+    </div>
+    <div class="giant" aria-hidden="true">Benny</div>
+  </div>
+  <div class="legal"><span>Built in public at heyshoo.in</span><span>Not affiliated with GitHub or Cloudflare</span></div>
+</div></footer>
+
+<script is:inline>
+// The "hover to wake him" note fades once any of the three stickers has been hovered or focused.
+(function () {
+  var facts = document.getElementById('facts');
+  if (!facts) return;
+  function used() { facts.classList.add('used'); }
+  facts.querySelectorAll('.swap').forEach(function (sticker) {
+    sticker.addEventListener('pointerenter', used);
+    sticker.addEventListener('focus', used);
+  });
+})();
+</script>
+</Page>

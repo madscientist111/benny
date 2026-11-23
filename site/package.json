@@ -1,0 +1,16 @@
+{
+	"name": "benny-site",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"deploy": "astro build && cf deploy ./dist --profile personal"
+	},
+	"dependencies": {
+		"astro": "^5.0.0"
+	},
+	"devDependencies": {
+		"cf": "^1.0.0-beta.18"
+	}
+}
