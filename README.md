@@ -162,4 +162,4 @@ GitHub is the focus for now, and I want that workflow solid first. Slack comes n
 
 ## Licence
 
-[MIT LICENSE](LICENSE). Built with <3 by [shoo](https://github.com/madscientist111).
+[MIT](LICENSE). Built with <3 by [shoo](https://github.com/madscientist111).
