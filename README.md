@@ -162,4 +162,4 @@ GitHub is the focus for now, and I want that workflow solid first. Slack comes n
 
 ## Licence
 
-[Apache 2.0](LICENSE). Built by [Devanshu Bhatt](https://github.com/madscientist111).
+[MIT](LICENSE). Built by [Devanshu Bhatt](https://github.com/madscientist111).
