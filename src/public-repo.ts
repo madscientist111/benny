@@ -1,6 +1,6 @@
 import { defineExtension, defineTool } from '@earendil-works/pi-durable'
 import { getWorkspace, type LazyWorkspaceClient } from '@cloudflare/computer'
-import { lowerRepoName } from './github-contract'
+import { lowerRepoName } from './github/github-contract'
 import { log } from './log'
 import type { RepoDO } from './repo-do'
 import { workspaceTools } from './workspace-tools'

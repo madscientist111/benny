@@ -1,7 +1,7 @@
 import type { GitHubAdapter } from '@chat-adapter/github'
-import type { PrChanges } from './pi-agent'
-import { log } from './log'
-import { isSecretPath } from './secret-files'
+import type { PrChanges } from '../pi-agent'
+import { log } from '../log'
+import { isSecretPath } from '../secret-files'
 
 // Loads a PR's version of its changed files from GitHub for `PiAgent.replacePrChanges`, and writes
 // the summary that tells the model which files the PR changes. Secret, binary and oversized files

@@ -15,8 +15,8 @@ import {
     type BranchStartResult,
     type BranchStatus,
     type KeepFilesRequest,
-} from './github-contract'
-import { GitHubRequestError, githubJson } from './github-rest'
+} from './github/github-contract'
+import { GitHubRequestError, githubJson } from './github/github-rest'
 import { log, type LogIds } from './log'
 import { isSecretPath } from './secret-files'
 

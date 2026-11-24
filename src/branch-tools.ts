@@ -7,8 +7,8 @@ import {
     type BranchCopy,
     type RunWriteKind,
     type ThreadWork,
-} from './github-contract'
-import { BENNY_LOGIN, prSize, WRITE_REFUSED_TEXT, type Octokit } from './github-tools'
+} from './github/github-contract'
+import { BENNY_LOGIN, prSize, WRITE_REFUSED_TEXT, type Octokit } from './github/github-tools'
 import { log } from './log'
 import type { SandboxClient } from './sandbox-contract'
 

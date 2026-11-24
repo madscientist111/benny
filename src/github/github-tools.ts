@@ -11,9 +11,9 @@ import {
     type RunWriteKind,
     type ThreadWork,
 } from './github-contract'
-import { log } from './log'
-import { isSecretPath } from './secret-files'
-import { capOutput } from './tool-output-cap'
+import { log } from '../log'
+import { isSecretPath } from '../secret-files'
+import { capOutput } from '../tool-output-cap'
 
 // The GitHub tools (batch 5 plan, section 3): 7 that read issues, PRs, checks and files, and 7 that
 // write. They call only the endpoints named below, so a missing tool cannot be reached by a clever

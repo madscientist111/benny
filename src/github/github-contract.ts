@@ -1,4 +1,4 @@
-import type { LogIds } from './log'
+import type { LogIds } from '../log'
 
 // Shared names for batch 5 (`scratchpad/batch-5-github-tools-plan.md`): the GitHub tools, the
 // thread's work branch, and the branch copy that holds it. `BranchDO` (G2) implements `BranchCopy`;
