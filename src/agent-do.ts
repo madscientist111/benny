@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import { log } from './log'
-import type { PrChanges } from './pi-agent'
+import type { PrChanges } from './pi/agent'
 import { readCappedText } from './sandbox-shell'
 import { tarStream, type TarEntry } from './sandbox-tar'
 import { isSecretPath } from './secret-files'

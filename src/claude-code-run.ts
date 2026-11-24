@@ -1,9 +1,9 @@
 import type { AgentTask, AgentTaskReport, AgentTaskState, WorkspaceCopy } from './agent-do'
-import type { Harness, RunResult, RunUsage } from './harness-contract'
+import type { Harness, RunResult, RunUsage } from './pi/harness-contract'
 import { log } from './log'
 import type { McpTask } from './mcp-tools'
-import type { PrChanges } from './pi-agent'
-import { EFFORT_PARAGRAPH, EXPLANATION_PARAGRAPH, REVIEW_PARAGRAPH, VOICE_PARAGRAPH } from './reply-style'
+import type { PrChanges } from './pi/agent'
+import { EFFORT_PARAGRAPH, EXPLANATION_PARAGRAPH, REVIEW_PARAGRAPH, VOICE_PARAGRAPH } from './pi/reply-style'
 import { wait } from './wait'
 
 // The `Harness` contract over Claude Code: each task runs in the thread's container in the

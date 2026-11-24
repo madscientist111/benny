@@ -1,9 +1,9 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { ConversationIdle, type Registry } from "@earendil-works/pi-durable";
 import type { PiHarness } from "agents/harness/pi";
-import { CLAUDE_CODE_TOOL_NAME, type ClaudeCodeToolDetails } from "./claude-code-tool";
+import { CLAUDE_CODE_TOOL_NAME, type ClaudeCodeToolDetails } from "../claude-code-tool";
 import type { Harness, RunResult, RunUsage } from "./harness-contract";
-import { mergedIntervalsMs, type SandboxDetails, type SandboxInterval } from "./sandbox-tools";
+import { mergedIntervalsMs, type SandboxDetails, type SandboxInterval } from "../sandbox-tools";
 
 // The `Harness` contract over pi-durable: the thread's root pi session. `harness.ts` builds it when
 // `HARNESS` is `pi`, and `PiAgent` calls it. The code is what `PiAgent` called on pi directly

@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers'
-import { github } from './bot'
-import { repoObjectName, type RepoDO } from './repo-do'
-import { log } from './log'
+import { github } from '../bot'
+import { repoObjectName, type RepoDO } from '../repo-do'
+import { log } from '../log'
 
 // The GitHub events the Chat SDK never sees: a push to the default branch refreshes the repo's
 // `RepoDO` copy, and removing the App deletes it. `index.ts` tries this handler first.

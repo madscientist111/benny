@@ -10,11 +10,11 @@ import {
 } from "@earendil-works/pi-durable";
 import type { Agent } from "agents";
 import { PiHarness } from "agents/harness/pi";
-import { AGENT_SERVICE_BINDING, ClaudeCodeRun, type AgentServiceMethods, type AgentWorkspace, type ToolTaskAccess } from "./claude-code-run";
+import { AGENT_SERVICE_BINDING, ClaudeCodeRun, type AgentServiceMethods, type AgentWorkspace, type ToolTaskAccess } from "../claude-code-run";
 import type { Harness } from "./harness-contract";
-import { log } from "./log";
+import { log } from "../log";
 import { createAssistantModels, defaultModel, modelsInUse } from "./models";
-import { PiRun } from "./pi-run";
+import { PiRun } from "./run";
 
 // Builds the harness a `PiAgent` runs its thread on, chosen by `HARNESS`. For `pi`: the pi-durable
 // harness, its models, the turn limit of one run, and the context size above which a long thread

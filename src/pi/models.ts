@@ -18,7 +18,7 @@ const legacyModel = {
 
 /**
  * Every model reference Benny writes or has written (the git history of this file has no other);
- * `src/harness.ts` sets their compaction limit once at startup.
+ * `src/pi/harness.ts` sets their compaction limit once at startup.
  */
 export const modelsInUse = [defaultModel, legacyModel] as const;
 
