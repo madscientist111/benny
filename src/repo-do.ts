@@ -1,8 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import { Workspace, type WorkspaceStub } from "@cloudflare/computer";
 import { applyCompare, archiveCheckout, fetchCompare, importTarball, importTarStream, REPO_DIR, type ImportCounts } from './checkout'
-import { lowerRepoName } from './github/github-contract'
-import { githubJson } from './github/github-rest'
+import { lowerRepoName } from './github/contract'
+import { githubJson } from './github/rest'
 import { log, type LogIds } from './log'
 import { fetchPublicTarball, PUBLIC_REPO_LIMITS } from './public-repo'
 

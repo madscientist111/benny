@@ -10,7 +10,7 @@ import { buildFirstContext, githubContextBlock, type ContextInput } from './cont
 import { loadPrChanges } from './github/pr-changes'
 import { log } from './log'
 import { recordMessage } from './thread-window'
-import { httpStatus } from './github/github-contract'
+import { httpStatus } from './github/contract'
 import { isPaused, postStatus, reportFailure, setPaused } from './request-reporter'
 import { clearInputRequired, hasInputRequired } from './input-required'
 import { withoutTitleMarks } from './github/title-marks'

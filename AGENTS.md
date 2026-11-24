@@ -36,7 +36,7 @@ or agent.
   token, at 250 MB and 30,000 files, and at most 4 per thread. Its copy lives in its own `RepoDO`
   (`public:<owner>/<repo>`), and the thread's repo stays primary for every branch tool and PR.
 - **A read of another repo needs every requester to be a member of it** (`readRepo` in
-  `src/github/github-tools.ts`), and never reads a private repo from a public thread's repo: the reply is
+  `src/github/tools.ts`), and never reads a private repo from a public thread's repo: the reply is
   public, so it must not hold private content.
 - **GitHub writes are gated:** a GitHub write or branch tool runs only when every pending request
   of the run is a mention from a member with write access (`#runMayWrite`), and only on the

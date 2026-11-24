@@ -31,8 +31,8 @@ import {
 import { github } from './bot'
 import type { BranchDO } from './branch-do'
 import { branchTools } from './branch-tools'
-import { branchObjectName, lowerRepoName, RUN_WRITE_LIMITS, type BranchCopy, type RunWriteCounts, type RunWriteKind, type ThreadWork } from './github/github-contract'
-import { githubTools, WRITE_REFUSED_TEXT, type Octokit } from './github/github-tools'
+import { branchObjectName, lowerRepoName, RUN_WRITE_LIMITS, type BranchCopy, type RunWriteCounts, type RunWriteKind, type ThreadWork } from './github/contract'
+import { githubTools, WRITE_REFUSED_TEXT, type Octokit } from './github/tools'
 import { setInputRequired } from './input-required'
 import { askReplyWaits } from './jev/classify'
 import { createWebTools } from "./web-tools";

@@ -1,5 +1,5 @@
-import { httpStatus } from './github-contract'
-import type { Octokit } from './github-tools'
+import { httpStatus } from './contract'
+import type { Octokit } from './tools'
 import { log, type LogIds } from '../log'
 import { SCHEDULED_PREFIX, withoutTitleMark, withTitleMark } from './title-marks'
 

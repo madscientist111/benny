@@ -10,7 +10,7 @@ import {
     RUN_WRITE_LIMITS,
     type RunWriteKind,
     type ThreadWork,
-} from './github-contract'
+} from './contract'
 import { log } from '../log'
 import { isSecretPath } from '../secret-files'
 import { capOutput } from '../tool-output-cap'
