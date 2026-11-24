@@ -31,8 +31,8 @@ import {
 import { github } from './bot'
 import type { BranchDO } from './branch-do'
 import { branchTools } from './branch-tools'
-import { branchObjectName, lowerRepoName, RUN_WRITE_LIMITS, type BranchCopy, type RunWriteCounts, type RunWriteKind, type ThreadWork } from './github-contract'
-import { githubTools, WRITE_REFUSED_TEXT, type Octokit } from './github-tools'
+import { branchObjectName, lowerRepoName, RUN_WRITE_LIMITS, type BranchCopy, type RunWriteCounts, type RunWriteKind, type ThreadWork } from './github/contract'
+import { githubTools, WRITE_REFUSED_TEXT, type Octokit } from './github/tools'
 import { setInputRequired } from './input-required'
 import { askReplyWaits } from './jev/classify'
 import { createWebTools } from "./web-tools";
@@ -42,7 +42,7 @@ import {
     saveCronCopy, withFiring, type CronFiring, type CronInput, type CronRecord, type FiringOutcome,
 } from './crons'
 import { checkFiringLimit, countsTowardLimit, firingLimitSentence, lastFiringNote, skippedLastFiringNote, withCountedFiring } from './cron-limit'
-import { updateScheduledMark } from './scheduled-mark'
+import { updateScheduledMark } from './github/scheduled-mark'
 import { publicRepoTools, type PublicRepo } from './public-repo'
 import { workspaceTools } from "./workspace-tools";
 

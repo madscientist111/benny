@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { INPUT_REQUIRED_PREFIX, SCHEDULED_PREFIX, withoutTitleMark, withoutTitleMarks, withTitleMark } from '../src/title-marks.ts'
+import { INPUT_REQUIRED_PREFIX, SCHEDULED_PREFIX, withoutTitleMark, withoutTitleMarks, withTitleMark } from '../src/github/title-marks.ts'
 
-// Checks of the title marks (src/title-marks.ts): the waiting and scheduled prefixes go on and come
+// Checks of the title marks (src/github/title-marks.ts): the waiting and scheduled prefixes go on and come
 // off on their own, in a fixed order, never twice, whatever the title started with.
 
 const BARE_TITLE = 'Daily work digest'

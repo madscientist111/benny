@@ -1,6 +1,6 @@
-import { httpStatus } from './github-contract'
-import type { Octokit } from './github-tools'
-import { log, type LogIds } from './log'
+import { httpStatus } from './contract'
+import type { Octokit } from './tools'
+import { log, type LogIds } from '../log'
 import { SCHEDULED_PREFIX, withoutTitleMark, withTitleMark } from './title-marks'
 
 // The scheduled mark (`docs/crons/plan.md`, requirement 22): a `[SCHEDULED] ` title prefix plus a

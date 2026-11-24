@@ -1,5 +1,5 @@
 import type { Workspace } from '@cloudflare/computer'
-import { githubJson, githubStream } from './github-rest'
+import { githubJson, githubStream } from './github/rest'
 import { log, type LogIds } from './log'
 import { tarStream, type TarEntry } from './sandbox-tar'
 import { isSecretPath } from './secret-files'

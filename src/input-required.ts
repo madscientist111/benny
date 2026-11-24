@@ -1,8 +1,8 @@
 import { bot } from './bot'
-import { httpStatus, lowerRepoName } from './github-contract'
-import type { Octokit } from './github-tools'
+import { httpStatus, lowerRepoName } from './github/contract'
+import type { Octokit } from './github/tools'
 import { log, type LogIds } from './log'
-import { INPUT_REQUIRED_PREFIX, withoutTitleMark, withTitleMark } from './title-marks'
+import { INPUT_REQUIRED_PREFIX, withoutTitleMark, withTitleMark } from './github/title-marks'
 
 // The waiting mark (`docs/input-required/plan.md`): a `[INPUT_REQUIRED] ` title prefix plus an
 // `input-required` label on an issue or PR that waits for a writer. `PiAgent` sets it after a reply

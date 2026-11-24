@@ -2,8 +2,8 @@ import { defineExtension, defineTool } from "@earendil-works/pi-durable";
 import type { LazyWorkspaceClient, Workspace } from "@cloudflare/computer";
 import { createPiTools, type PiToolResultContent } from "@cloudflare/computer/tools/pi-ai";
 import { log } from './log'
-import { isForbiddenPath } from './github-contract'
-import { withNote } from './github-tools'
+import { isForbiddenPath } from './github/contract'
+import { withNote } from './github/tools'
 import { isSecretPath } from "./secret-files";
 import { capOutput, isListingTool } from './tool-output-cap'
 

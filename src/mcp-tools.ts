@@ -6,7 +6,7 @@ import { renderToolSample } from '@earendil-works/pi-codemode/declarations'
 import type { CodemodeResult, CodemodeSandboxBase, CodemodeTool } from '@earendil-works/pi-codemode/portable'
 import { framedScriptText } from './codemode'
 import { codemodeCallRefusal, type CodemodeCallKind } from './codemode-limits'
-import { WRITE_REFUSED_TEXT } from './github-tools'
+import { WRITE_REFUSED_TEXT } from './github/tools'
 import { log } from './log'
 import { RUN_CODE_REFUSED_TEXT } from './sandbox-tools'
 
