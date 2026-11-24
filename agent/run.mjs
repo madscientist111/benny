@@ -6,8 +6,8 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 
 const MAX_TURNS = 30
-/** Pinned: never above Sonnet. */
-const MODEL = 'claude-sonnet-5-5'
+/** Pinned: Opus. */
+const MODEL = 'claude-opus-5-5'
 /**
  * The subscription token is in this process's env and so readable by the model's Bash through
  * /proc. These rules and the prompt below make reading it harder; they are not a lock.
