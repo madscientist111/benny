@@ -1,0 +1,42 @@
+---
+// One blog post at /blog/<file name>/, built from its Markdown file in src/content/blog/.
+import { render } from "astro:content";
+import Page from "../../layouts/Page.astro";
+import BlogHeader from "../../components/BlogHeader.astro";
+import ClosingPanel from "../../components/ClosingPanel.astro";
+import { publishedPosts } from "../../lib/posts";
+import "../../styles/landing.css";
+import "../../styles/blog.css";
+
+export async function getStaticPaths() {
+	const posts = await publishedPosts();
+	return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" });
+---
+
+<Page
+	title={`${post.data.title} | Benny`}
+	description={post.data.description}
+	article={{ headline: post.data.title, published: post.data.published, updated: post.data.updated }}
+	shareImage={post.data.shareImage}
+>
+<BlogHeader>
+  <time datetime={post.data.published.toISOString()}>{dateFormat.format(post.data.published)} · Devanshu Bhatt</time>
+  <h1 class="display">{post.data.title}</h1>
+  <p>{post.data.description}</p>
+</BlogHeader>
+
+<section><div class="in">
+  {post.data.image && <img class="post-image" src={post.data.image} width="1536" height="1024" alt={post.data.imageAlt ?? ""} />}
+  <article class="prose"><Content /></article>
+</div></section>
+
+<ClosingPanel
+	heading="Run your factory where you already work."
+	text="Benny lives in your GitHub issues and opens pull requests a person merges. Read the code; it is MIT licensed."
+/>
+</Page>
