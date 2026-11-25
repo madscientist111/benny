@@ -1,0 +1,41 @@
+---
+// The blog's front page at /blog: every published post, newest first.
+import Page from "../../layouts/Page.astro";
+import BlogHeader from "../../components/BlogHeader.astro";
+import ClosingPanel from "../../components/ClosingPanel.astro";
+import { publishedPosts } from "../../lib/posts";
+import "../../styles/landing.css";
+import "../../styles/blog.css";
+
+const posts = await publishedPosts();
+const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" });
+---
+
+<Page
+	title="Blog: running a software factory on GitHub | Benny"
+	description="Notes from building Benny, an open-source coding agent that lives in GitHub issues: always-on agents, self-hosting on Cloudflare, and running a software factory where your team already works."
+>
+<BlogHeader>
+  <h1 class="display">Notes from the factory floor</h1>
+  <p>Running a software factory on GitHub, where your team already works. Written while building Benny.</p>
+</BlogHeader>
+
+<section><div class="in">
+  {posts.length === 0
+    ? <p class="empty">The first post is on its way.</p>
+    : <ol class="post-list">
+        {posts.map((post) => (
+          <li><a href={`/blog/${post.id}/`}>
+            <h2>{post.data.title}</h2>
+            <p>{post.data.description}</p>
+            <time datetime={post.data.published.toISOString()}>{dateFormat.format(post.data.published)}</time>
+          </a></li>
+        ))}
+      </ol>}
+</div></section>
+
+<ClosingPanel
+	heading="Stay where you already work."
+	text="Benny lives in your GitHub issues and runs on your own Cloudflare account. It is MIT licensed."
+/>
+</Page>

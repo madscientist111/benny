@@ -9,6 +9,8 @@ Every issue gets its own agent, which keeps its context and its work branch and 
 - [Benny](https://benny.heyshoo.in/): what it is, how one request goes from mention to pull request, and how it compares with Devin, Capy and Factory's Droids.
 - [Software factory](https://benny.heyshoo.in/software-factory/): issues go in, reviewed pull requests come out, with schedules for repeating work.
 - [For teams](https://benny.heyshoo.in/for-teams/): a self-hosted AI software engineer set up on your team's own accounts.
+- [Blog](https://benny.heyshoo.in/blog/): notes on running a software factory on GitHub; RSS at https://benny.heyshoo.in/rss.xml.
+  - [I don't want to learn another agentic UI](https://benny.heyshoo.in/blog/i-dont-want-another-agentic-ui.md): why I run my software factory on GitHub with a self-hosted coding agent, and what it costs (Markdown).
 
 ## Project
 
