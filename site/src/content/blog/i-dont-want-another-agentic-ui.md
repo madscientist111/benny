@@ -7,7 +7,7 @@ published: 2026-11-26
 draft: false
 image: "/blog/i-dont-want-another-agentic-ui.webp"
 imageAlt: "Benny the beaver running a small factory line: blank cards go in, ticked cards come out, and a hand gives a thumbs up"
-shareImage: "/blog/i-dont-want-another-agentic-ui-share.jpg"
+shareImage: "/blog/i-dont-want-another-agentic-ui-share-2.jpg"
 ---
 
 I don't want to learn another "agentic" UI, dawg. Can't we stick to what we have?
