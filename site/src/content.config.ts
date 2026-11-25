@@ -7,6 +7,9 @@ const blog = defineCollection({
 	loader: glob({ pattern: "*.md", base: "./src/content/blog" }),
 	schema: z.object({
 		title: z.string(),
+		// The <title> search engines show; the post's H1 and link previews keep `title`.
+		seoTitle: z.string().max(70).optional(),
+		keywords: z.array(z.string()).default([]),
 		description: z.string().max(170),
 		published: z.coerce.date(),
 		updated: z.coerce.date().optional(),

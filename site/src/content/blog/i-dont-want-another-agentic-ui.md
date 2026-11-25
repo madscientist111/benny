@@ -1,5 +1,7 @@
 ---
 title: "I don't want to learn another agentic UI"
+seoTitle: "Run your software factory on GitHub, not another agentic UI | Benny"
+keywords: ["software factory on GitHub", "always-on coding agent", "open-source coding agent", "self-hosted coding agent", "GitHub issue to pull request"]
 description: "Everyone is building a new UI for AI agents. I run my software factory on GitHub instead, with an open-source coding agent that lives in my issues."
 published: 2026-11-26
 draft: false
@@ -24,9 +26,9 @@ So "where the agent lives" is mostly solved. What I care about is who runs it. T
 
 ## So I run my own factory on GitHub
 
-For code, GitHub already is a software factory. Issues go in, the thread is where the team argues, pull requests come out, and a person decides what ships. It just needed someone on the line doing the work.
+For code, GitHub already is a [software factory](/software-factory/). Issues go in, the thread is where the team argues, pull requests come out, and a person decides what ships. It just needed someone on the line doing the work.
 
-That's Benny, an always-on coding agent that lives in my GitHub issues. I mention it in an issue, it reads the code and proposes what to build, and once I say go, it works on its own branch and opens a pull request. It can't merge, approve or close a pull request, so a person always signs off.
+That's [Benny](/), an always-on coding agent that lives in my GitHub issues. I mention it in an issue, it reads the code and proposes what to build, and once I say go, it works on its own branch and opens a pull request. It can't merge, approve or close a pull request, so a person always signs off.
 
 Each issue I mention it in gets its own agent. It keeps that thread's context and its work branch, and sleeps between comments, so it picks up where it left off.
 

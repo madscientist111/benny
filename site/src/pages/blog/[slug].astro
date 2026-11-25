@@ -19,9 +19,10 @@ const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: 
 ---
 
 <Page
-	title={`${post.data.title} | Benny`}
+	title={post.data.seoTitle ?? `${post.data.title} | Benny`}
+	socialTitle={post.data.title}
 	description={post.data.description}
-	article={{ headline: post.data.title, published: post.data.published, updated: post.data.updated }}
+	article={{ headline: post.data.title, published: post.data.published, updated: post.data.updated, keywords: post.data.keywords, wordCount: post.body?.split(/\s+/).length, markdownPath: `/blog/${post.id}.md` }}
 	shareImage={post.data.shareImage}
 >
 <BlogHeader>
