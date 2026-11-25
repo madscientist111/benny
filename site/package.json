@@ -5,9 +5,10 @@
 	"scripts": {
 		"dev": "astro dev",
 		"build": "astro build",
-		"deploy": "astro build && cf deploy ./dist --profile personal"
+		"deploy": "astro build && cf deploy ./dist --profile devanshu"
 	},
 	"dependencies": {
+		"@astrojs/sitemap": "^3.2.0",
 		"astro": "^5.0.0"
 	},
 	"devDependencies": {

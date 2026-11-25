@@ -1,0 +1,75 @@
+---
+// The second landing page, at `/software-factory`: the same product told as a factory, where
+// issues go in and reviewed pull requests come out. It shares the main page's look and components
+// but none of its sentences, so search engines treat it as its own page. Every claim is one the
+// README already makes; there are no customers or numbers.
+import Page from "../layouts/Page.astro";
+import ExampleThread from "../components/ExampleThread.astro";
+import ClosingPanel from "../components/ClosingPanel.astro";
+import "../styles/landing.css";
+
+const repo = "https://github.com/madscientist111/benny";
+---
+
+<Page
+	title="An open-source software factory on GitHub | Benny"
+	description="Benny is a self-hosted AI software factory for GitHub. Every issue gets its own always-on agent: issues go in, reviewed pull requests come out, and a person merges. MIT licensed, on your own Cloudflare account."
+>
+<div class="band-blue"><div class="in">
+  <div class="nav">
+    <a class="mark" href="/">Benny <span class="mark-tag">software factory</span></a>
+    <ul><li><a href="#how">How work moves</a></li><li><a href="#limits">Limits</a></li><li><a href="/">Benny, the agent</a></li><li><a href="/for-teams">For teams</a></li></ul>
+    <a class="gh" href={repo}><svg><use href="#i-gh"/></svg>Star on GitHub</a>
+  </div>
+  <div class="hero">
+    <p class="oss"><svg><use href="#i-star"/></svg>Open source under the MIT licence</p>
+    <h1 class="display"><span>An open-source</span> <span>software factory <img class="sticker" src="/art/laptop.webp" width="600" height="600" alt="Benny the beaver, typing on a laptop"></span> <span>on GitHub</span></h1>
+    <p class="lede">Your GitHub issues are the factory floor. Each one gets its own always-on agent, and reviewed pull requests come out the other end. You run it yourself, on your own Cloudflare account.</p>
+    <div class="cta">
+      <a class="btn" href={repo}><svg><use href="#i-gh"/></svg>Read the repo on GitHub</a>
+      <a class="btn ghost" href="#how">See how work moves</a>
+    </div>
+    <ExampleThread />
+  </div>
+</div></div>
+
+<section class="facts-sec"><div class="in">
+  <div class="facts">
+    <div><div class="swap" tabindex="0"><img class="sticker one" src="/art/sleep.webp" width="600" height="600" alt="Benny asleep; he wakes when you point at him"><img class="sticker two" src="/art/awake.webp" width="600" height="600" alt="" aria-hidden="true"></div><h3>One agent for each issue</h3><p>Open a hundred issues and you have a hundred agents. Each keeps its own context and its own work branch, and sleeps for free until a comment or a schedule wakes it.</p></div>
+    <div><div class="swap" tabindex="0"><img class="sticker one" src="/art/cloud.webp" width="600" height="600" alt="Benny working on a cloud"><img class="sticker two" src="/art/cloudwave.webp" width="600" height="600" alt="" aria-hidden="true"></div><h3>Your own plant</h3><p>It runs on your Cloudflare account and uses the Claude Code or OpenCode Go subscription you already pay for. There is no hosted version and no seat to buy.</p></div>
+    <div><div class="swap" tabindex="0"><img class="sticker one" src="/art/handoff.webp" width="600" height="600" alt="Benny holding out a pull request"><img class="sticker two" src="/art/thumbs.webp" width="600" height="600" alt="" aria-hidden="true"></div><h3>A person signs off</h3><p>The line ends at a pull request. Benny has no way to merge, approve or close one, so nothing ships until someone on your team says so.</p></div>
+  </div>
+</div></section>
+
+<section id="how"><div class="in steps">
+  <h2 class="sec-title">How work moves through the factory</h2>
+  <div class="plain-steps">
+    <div class="step-line"><h3><i>1</i>An issue comes in</h3><p>Someone writes the problem in a GitHub issue and mentions Benny. That is the order slip; there is no other queue to feed.</p></div>
+    <div class="step-line"><h3><i>2</i>The requirements are agreed</h3><p>Benny reads the code, says what it found and proposes what to build. When it needs an answer it labels the issue <code>input-required</code>, so one search lists every thread waiting for a person.</p></div>
+    <div class="step-line"><h3><i>3</i>A pull request comes out</h3><p>Once someone says go, Benny works on its own branch, runs the tests, has the pull request reviewed and fixes what the review finds.</p></div>
+    <div class="step-line"><h3><i>4</i>A person merges</h3><p>The pull request links the issue it came from. A member of your team reads it and merges it, or sends it back with a comment.</p></div>
+  </div>
+  <p class="sec-lede">Some work repeats. Ask in an issue, for example "every weekday at 9am, post a digest of what merged and what is stuck", and Benny keeps that schedule and posts in the same issue each time it is due.</p>
+</div></section>
+
+<section class="rules-sec" id="limits"><div class="in grid">
+  <div><h2 class="sec-title">What the factory will and won't do</h2><p class="sec-lede">The limits are part of the code, not a promise in a prompt.</p></div>
+  <div class="rules">
+    <div class="yes"><h3>It will</h3><ul>
+      <li><svg><use href="#i-check"/></svg>Take work only from a repo member with write access.</li>
+      <li><svg><use href="#i-check"/></svg>Commit only to its own <code>benny/...</code> branches.</li>
+      <li><svg><use href="#i-check"/></svg>Stop a run after 30 minutes and say so.</li>
+    </ul></div>
+    <div class="no"><h3>It won't</h3><ul>
+      <li><svg><use href="#i-cross"/></svg>Merge, approve or close a pull request.</li>
+      <li><svg><use href="#i-cross"/></svg>Change your GitHub workflows.</li>
+      <li><svg><use href="#i-cross"/></svg>Show the model your <code>.env</code> files or keys.</li>
+    </ul></div>
+  </div>
+</div></section>
+
+<ClosingPanel
+	heading="The floor is open. Come and read the code."
+	text="Benny is an experiment that runs my own work, so read it, copy what you like and fork it. It is MIT licensed."
+/>
+</Page>
