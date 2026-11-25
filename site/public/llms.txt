@@ -1,0 +1,20 @@
+# Benny
+
+> Benny, the always-on coding agent for GitHub issues. An open-source Devin alternative: mention it in an issue, agree the requirements, and it opens a pull request. It runs on your own Cloudflare account with your Claude Code or OpenCode Go subscription. MIT licence.
+
+Every issue gets its own agent, which keeps its context and its work branch and sleeps between comments. Benny opens pull requests and cannot merge, approve or close one; a person always merges.
+
+## Pages
+
+- [Benny](https://benny.heyshoo.in/): what it is, how one request goes from mention to pull request, and how it compares with Devin, Capy and Factory's Droids.
+- [Software factory](https://benny.heyshoo.in/software-factory/): issues go in, reviewed pull requests come out, with schedules for repeating work.
+- [For teams](https://benny.heyshoo.in/for-teams/): a self-hosted AI software engineer set up on your team's own accounts.
+
+## Project
+
+- [GitHub repository](https://github.com/madscientist111/benny): the source, MIT licensed.
+- [README](https://github.com/madscientist111/benny#readme): why it was built, how it is built, what it may and may not do, and its limitations.
+
+## Background
+
+- [Building always-on agents](https://claude.com/resources/articles/building-always-on-agents): Anthropic's article on agents that sleep between events; Benny works this way.

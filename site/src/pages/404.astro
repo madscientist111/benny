@@ -1,0 +1,18 @@
+---
+// The page Cloudflare serves for any address that does not exist (`notFoundHandling: "404-page"`).
+import Page from "../layouts/Page.astro";
+import "../styles/landing.css";
+---
+
+<Page title="Page not found | Benny" description="This page does not exist. Benny is an always-on coding agent for GitHub issues." notFound>
+<div class="band-blue"><div class="in">
+  <div class="nav">
+    <a class="mark" href="/">Benny</a>
+  </div>
+  <div class="hero">
+    <h1 class="display"><span>No page here.</span></h1>
+    <p class="lede">That address does not exist. Benny's home page does.</p>
+    <div class="cta"><a class="btn" href="/">Back to the home page</a></div>
+  </div>
+</div></div>
+</Page>
