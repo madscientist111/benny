@@ -23,4 +23,5 @@
 .prose img { max-width: 100%; height: auto; border-radius: 12px }
 .prose hr { border: 0; border-top: 1px solid var(--cream-line); margin: 2em 0 }
 .empty { color: var(--ink-soft) }
-.post-image { display: block; width: 100%; max-width: 820px; height: auto; border-radius: 20px; margin: calc(-1 * clamp(64px, 9vw, 120px)) 0 clamp(28px, 4vw, 44px) }
+/* The art's blue is a shade off the band's, so a white sticker edge makes the card read as intentional. */
+.post-image { display: block; width: 100%; max-width: 820px; height: auto; border-radius: 24px; border: 6px solid var(--white); box-shadow: 0 18px 30px -18px rgb(8 20 70 / 0.35); margin: calc(-1 * clamp(64px, 9vw, 120px)) 0 clamp(28px, 4vw, 44px) }
