@@ -25,13 +25,17 @@ const dateFormat = new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: 
 	shareImage={post.data.shareImage}
 >
 <BlogHeader>
-  <time datetime={post.data.published.toISOString()}>{dateFormat.format(post.data.published)} · Devanshu Bhatt</time>
-  <h1 class="display">{post.data.title}</h1>
-  <p>{post.data.description}</p>
+  <div class:list={["post-head", { "has-image": post.data.image }]}>
+    <div>
+      <time datetime={post.data.published.toISOString()}>{dateFormat.format(post.data.published)} · Devanshu Bhatt</time>
+      <h1 class="display">{post.data.title}</h1>
+      <p>{post.data.description}</p>
+    </div>
+    {post.data.image && <img class="post-image" src={post.data.image} width="1536" height="1024" alt={post.data.imageAlt ?? ""} />}
+  </div>
 </BlogHeader>
 
 <section><div class="in">
-  {post.data.image && <img class="post-image" src={post.data.image} width="1536" height="1024" alt={post.data.imageAlt ?? ""} />}
   <article class="prose"><Content /></article>
 </div></section>
 
