@@ -83,7 +83,7 @@ export default defineConfig(({ mode }) => {
 				// A missing binding or any other value keeps today's behaviour.
 				CODEMODE_ENABLED: bindings.text('true'),
 				// The harness every thread runs on (issue #61): `pi` (pi-durable) or `claude-code`. Read once
-				// per `PiAgent` in `src/harness.ts`; any other value fails there.
+				// per `PiAgent` in `src/pi/harness.ts`; any other value fails there.
 				HARNESS: bindings.text(claudeCode ? 'claude-code' : 'pi'),
 				// pi's `claude_code` tool: only the exact `'true'`, with `AGENT_SERVICE` bound, offers it.
 				CLAUDE_CODE_TOOL_ENABLED: bindings.text(claudeCodeTool ? 'true' : 'false'),

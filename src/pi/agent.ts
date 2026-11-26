@@ -3,20 +3,20 @@ import { Workspace, getWorkspace, type WorkspaceStub } from "@cloudflare/compute
 import { WorkerShellBackend } from "@cloudflare/computer/backends/worker-shell";
 import { createGitClient } from "@cloudflare/computer/git";
 import { ConversationBusy, defineExtension, hook, ToolTask, type ToolRegistration } from "@earendil-works/pi-durable";
-import { codemodeExtension, scriptSandbox } from './codemode'
-import { codemodeLimitHooks, type CodemodeCallKind } from './codemode-limits'
+import { codemodeExtension, scriptSandbox } from '../codemode'
+import { codemodeLimitHooks, type CodemodeCallKind } from '../codemode-limits'
 import { createHarness } from './harness'
 import type { Harness, RunUsage } from './harness-contract'
-import { log, type LogIds } from './log'
-import type { AgentWorkspace, ToolTaskAccess } from './claude-code-run'
-import { claudeCodeTool, claudeCodeToolBindings } from './claude-code-tool'
-import { answerMcpRequest, mcpTools, newTaskToken, servedTools, taskTokenKey, toolAccessFor, TASK_TOKEN_KEY_PREFIX, unknownTaskReply, type McpReply, type McpRequest, type McpTools, type McpTask } from './mcp-tools'
-import { Benny } from "./pi-prompts";
-import { REPO_DIR } from './checkout'
-import { BENNY_GIT_IDENTITY, repoObjectName, type RepoDO } from "./repo-do";
-import { sandboxClient } from "./sandbox-client";
-import type { SandboxClient } from "./sandbox-contract";
-import { sandboxTools } from "./sandbox-tools";
+import { log, type LogIds } from '../log'
+import type { AgentWorkspace, ToolTaskAccess } from '../claude-code-run'
+import { claudeCodeTool, claudeCodeToolBindings } from '../claude-code-tool'
+import { answerMcpRequest, mcpTools, newTaskToken, servedTools, taskTokenKey, toolAccessFor, TASK_TOKEN_KEY_PREFIX, unknownTaskReply, type McpReply, type McpRequest, type McpTools, type McpTask } from '../mcp-tools'
+import { Benny } from "./prompts";
+import { REPO_DIR } from '../checkout'
+import { BENNY_GIT_IDENTITY, repoObjectName, type RepoDO } from "../repo-do";
+import { sandboxClient } from "../sandbox-client";
+import type { SandboxClient } from "../sandbox-contract";
+import { sandboxTools } from "../sandbox-tools";
 import {
     postStatus,
     reportFailure,
@@ -27,24 +27,24 @@ import {
     reportStopped,
     setPaused,
     updateStatus,
-} from "./request-reporter";
-import { github } from './bot'
-import type { BranchDO } from './branch-do'
-import { branchTools } from './branch-tools'
-import { branchObjectName, lowerRepoName, RUN_WRITE_LIMITS, type BranchCopy, type RunWriteCounts, type RunWriteKind, type ThreadWork } from './github/contract'
-import { githubTools, WRITE_REFUSED_TEXT, type Octokit } from './github/tools'
-import { setInputRequired } from './input-required'
-import { askReplyWaits } from './jev/classify'
-import { createWebTools } from "./web-tools";
-import { checkRepoSize } from './repo-size'
+} from "../github/request-reporter";
+import { github } from '../bot'
+import type { BranchDO } from '../branch-do'
+import { branchTools } from '../branch-tools'
+import { branchObjectName, lowerRepoName, RUN_WRITE_LIMITS, type BranchCopy, type RunWriteCounts, type RunWriteKind, type ThreadWork } from '../github/contract'
+import { githubTools, WRITE_REFUSED_TEXT, type Octokit } from '../github/tools'
+import { setInputRequired } from '../github/input-required'
+import { askReplyWaits } from '../jev/classify'
+import { createWebTools } from "../web-tools";
+import { checkRepoSize } from '../repo-size'
 import {
     CHECKED_FIRINGS, countCrons, cronTools, deleteCronCopy, FAILING_AFTER, formatFiringTime, MAX_CRONS, nextFirings, PAUSE_AFTER, postInIssue,
     saveCronCopy, withFiring, type CronFiring, type CronInput, type CronRecord, type FiringOutcome,
-} from './crons'
-import { checkFiringLimit, countsTowardLimit, firingLimitSentence, lastFiringNote, skippedLastFiringNote, withCountedFiring } from './cron-limit'
-import { updateScheduledMark } from './github/scheduled-mark'
-import { publicRepoTools, type PublicRepo } from './public-repo'
-import { workspaceTools } from "./workspace-tools";
+} from '../crons'
+import { checkFiringLimit, countsTowardLimit, firingLimitSentence, lastFiringNote, skippedLastFiringNote, withCountedFiring } from '../cron-limit'
+import { updateScheduledMark } from '../github/scheduled-mark'
+import { publicRepoTools, type PublicRepo } from '../public-repo'
+import { workspaceTools } from "../workspace-tools";
 
 // The thread's agent: one `PiAgent` Durable Object per GitHub thread. `bot.ts` hands it a request
 // and returns; the agent runs the model with its tools, keeps every unreported request in storage,

@@ -3,7 +3,7 @@ import { env } from 'cloudflare:workers'
 import { getAgentByName } from 'agents'
 import { github } from './bot'
 import { log } from './log'
-import type { PiAgent } from './pi-agent'
+import type { PiAgent } from './pi/agent'
 
 // Dev-only routes for live tests (`scripts/verify.mjs`); `index.ts` mounts them. Never in
 // production: they answer 404 unless `DEV_ROUTES_ENABLED` is exactly `'true'`, which

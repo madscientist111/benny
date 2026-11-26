@@ -1,8 +1,8 @@
-import type { RequestUsage } from './pi-agent'
-import { BOT_USERNAME, bot, github } from './bot'
-import { TASK_FAILURE_TEXTS } from './claude-code-run'
-import { log } from './log'
-import { appendToWindow } from './thread-window'
+import type { RequestUsage } from '../pi/agent'
+import { BOT_USERNAME, bot, github } from '../bot'
+import { TASK_FAILURE_TEXTS } from '../claude-code-run'
+import { log } from '../log'
+import { appendToWindow } from '../thread-window'
 
 // Everything a request shows on GitHub: the status comment, the reply, and the reactions on the
 // comment that asked. A run outlives the webhook that started it, so the agent reports itself.

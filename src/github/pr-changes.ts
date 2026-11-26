@@ -1,5 +1,5 @@
 import type { GitHubAdapter } from '@chat-adapter/github'
-import type { PrChanges } from '../pi-agent'
+import type { PrChanges } from '../pi/agent'
 import { log } from '../log'
 import { isSecretPath } from '../secret-files'
 

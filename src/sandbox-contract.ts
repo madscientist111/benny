@@ -1,5 +1,5 @@
 import type { DirectoryBackupGatewayBinding } from '@cloudflare/sandbox'
-import type { PrChanges } from './pi-agent'
+import type { PrChanges } from './pi/agent'
 
 // Shared types for the sandbox. Every caller reaches a thread's sandbox through `SandboxClient`,
 // whether the sandbox runs in this Worker (a `SandboxDO` stub) or in the deployed sandbox Worker
