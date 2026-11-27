@@ -1,4 +1,4 @@
-/* The landing page's whole look, imported by `src/pages/index.astro`. Blue field hero with a GitHub issue thread straddling into cream; cream sections explain; one blue panel closes the page and holds the footer. One fixed look in both themes, by choice. The display face is kept for the hero, the closing line and the wordmark; every other title is the text face in bold. */
+/* The landing page's whole look, imported by `src/components/Landing.astro`. Blue field hero with a GitHub issue thread straddling into cream; cream sections explain; one blue panel closes the page and holds the footer. One fixed look in both themes, by choice. The display face is kept for the hero, the closing line and the wordmark; every other title is the text face in bold. */
 :root {
   --blue: #2456d6; --blue-deep: #1a3fa6; --blue-soft: #dfe8ff; --blue-tint: #3b68de; --cream: #fbf1dc; --cream-deep: #f4e6c8; --cream-line: #e6d8b9;
   --yellow: #ffd23f; --spark: #f26b2a; --cf: #f38020; --cf-ink: #a84f06; --ink: #101216; --ink-soft: #4d5160; --white: #ffffff;
